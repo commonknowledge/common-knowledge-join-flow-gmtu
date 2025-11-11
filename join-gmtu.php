@@ -13,12 +13,13 @@ if (! defined('ABSPATH')) exit; // Exit if accessed directly
 
 // Error messages for out-of-area postcodes
 $outOfAreaLookupMessage = "<p>Sorry, this postcode is outside our coverage area.</p>";
-$outOfAreaSubmissionMessage = '<h3>Postcode Outside Coverage Area</h3><p>Sorry, this postcode is outside our coverage area. We are only able to accept members from Greater Manchester at this time.</p>';
+$outOfAreaSubmissionMessage = '<h3>Sorry</h3><p>We’re only able to support tenants living in the Greater Manchester area.</p><p>If you’re based elsewhere in the UK, there are other local tenant unions that may be able to help, and for urgent housing issues you can also contact <a href="https://www.shelter.org.uk/Shelter">Shelter</a> or <a href="https://www.crisis.org.uk/">Crisis</a>.</p><p>We’re sorry we can’t assist directly, but we hope you can get the support you need quickly.</p>';
 
 // Success notification settings
-$successNotificationEmails = ['alex@commonknowledge.coop'];
+$successNotificationEmails = ['alex@commonknowledge.coop', 'info@tenantsunion.org.uk'];
 $successNotificationSubject = 'New GMTU Member Registration';
 $successNotificationMessage = 'A new member has successfully registered through the join flow.';
+
 
 // Branch email addresses for notifications
 $branchEmailMap = [
