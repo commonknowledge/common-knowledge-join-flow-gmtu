@@ -16,19 +16,19 @@ $outOfAreaLookupMessage = "<p>Sorry, this postcode is outside our coverage area.
 $outOfAreaSubmissionMessage = '<h3>Postcode Outside Coverage Area</h3><p>Sorry, this postcode is outside our coverage area. We are only able to accept members from Greater Manchester at this time.</p>';
 
 // Success notification settings
-$successNotificationEmails = ['info@tenantsunion.org.uk'];
+$successNotificationEmails = ['alex@commonknowledge.coop'];
 $successNotificationSubject = 'New GMTU Member Registration';
 $successNotificationMessage = 'A new member has successfully registered through the join flow.';
 
 // Branch email addresses for notifications
 $branchEmailMap = [
-    "South Manchester" => null,
-    "Harpurhey" => null,
-    "Leve-Longsight" => null,
-    "Moss Side" => null,
-    "Hulme" => null,
-    "Middleton" => null,
-    "Rochdale" => null,
+    "South Manchester" => 'south.mcr@tenantsunion.org.uk',
+    "Harpurhey" => 'harpurhey@tenantsunion.org.uk',
+    "Leve-Longsight" => 'levenshulme-longsight@tenantsunion.org.uk',
+    "Moss Side" => 'moss-side@tenantsunion.org.uk',
+    "Hulme" => 'hulme@tenantsunion.org.uk',
+    "Middleton" => 'middleton@tenantsunion.org.uk',
+    "Rochdale" => 'rochdale@tenantsunion.org.uk',
     "Stockport" => null,
 ];
 
