@@ -265,6 +265,29 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
 });
 
 /**
+ * Add branch as a tag when tagging members.
+ *
+ * Filters the tags being added to services (Mailchimp, Action Network)
+ * to include the member's assigned branch as a tag.
+ *
+ * @since 0.1.0
+ *
+ * @param array  $addTags Array of tag names to add.
+ * @param array  $data    Complete member data.
+ * @param string $service Service name ('mailchimp' or 'action_network').
+ * @return array Modified tags array with branch added.
+ */
+add_filter('ck_join_flow_add_tags', function ($addTags, $data, $service) {
+    $branch = $data['branch'] ?? null;
+    
+    if (!empty($branch)) {
+        $addTags[] = $branch;
+    }
+    
+    return $addTags;
+}, 10, 3);
+
+/**
  * Get formatted member details from registration data.
  *
  * @since 0.1.0
