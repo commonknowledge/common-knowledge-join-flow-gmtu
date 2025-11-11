@@ -296,9 +296,7 @@ function gmtu_build_email_body($introMessage, $memberDetails, $includeZetkinLink
     $emailBody .= "Name: " . $memberDetails['name'] . "\n";
     $emailBody .= "Email: " . $memberDetails['email'] . "\n";
     $emailBody .= "Postcode: " . $memberDetails['postcode'] . "\n";
-    if ($memberDetails['branch']) {
-        $emailBody .= "Branch: " . $memberDetails['branch'] . "\n";
-    }
+    $emailBody .= "Branch: " . ($memberDetails['branch'] ?: 'No branch found') . "\n";
     
     if ($includeZetkinLink) {
         $emailBody .= "\nBefore the new member can be found in Zetkin, they need to be authorised. It takes two seconds.\n";
@@ -340,7 +338,6 @@ add_action("ck_join_flow_success", function ($data) use ($successNotificationEma
     }
     
     $memberDetails = gmtu_get_member_details($data);
-    $memberDetails['branch'] = $memberDetails['branch'] ?? 'N/A'; // Show 'N/A' instead of null in general notification
     $emailBody = gmtu_build_email_body($successNotificationMessage, $memberDetails);
     
     gmtu_send_notification_emails($successNotificationEmails, $successNotificationSubject, $emailBody);
