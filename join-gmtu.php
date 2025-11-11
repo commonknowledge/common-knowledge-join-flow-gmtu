@@ -11,6 +11,27 @@
 
 if (! defined('ABSPATH')) exit; // Exit if accessed directly
 
+// Error messages for out-of-area postcodes
+$outOfAreaLookupMessage = "<p>Sorry, this postcode is outside our coverage area.</p>";
+$outOfAreaSubmissionMessage = '<h3>Postcode Outside Coverage Area</h3><p>Sorry, this postcode is outside our coverage area. We are only able to accept members from Greater Manchester at this time.</p>';
+
+// Success notification settings
+$successNotificationEmails = ['info@tenantsunion.org.uk'];
+$successNotificationSubject = 'New GMTU Member Registration';
+$successNotificationMessage = 'A new member has successfully registered through the join flow.';
+
+// Branch email addresses for notifications
+$branchEmailMap = [
+    "South Manchester" => null,
+    "Harpurhey" => null,
+    "Leve-Longsight" => null,
+    "Moss Side" => null,
+    "Hulme" => null,
+    "Middleton" => null,
+    "Rochdale" => null,
+    "Stockport" => null,
+];
+
 $branchMap = [
     "M1" => "South Manchester",
     "M2" => "South Manchester",
@@ -91,10 +112,120 @@ $branchMap = [
     "SK23" => null,
 ];
 
-// Populate "branch" custom field from postcode
-add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
+/**
+ * Get outcode from postcode using postcodes.io API.
+ *
+ * @since 0.1.0
+ *
+ * @param string $postcode The postcode to lookup.
+ * @return string|null The outcode or null if not found/error.
+ */
+function gmtu_get_postcode_outcode($postcode) {
     global $joinBlockLog;
+    
+    if (empty($postcode)) {
+        return null;
+    }
+    
+    try {
+        $url = "https://api.postcodes.io/postcodes/" . rawurlencode($postcode);
+        $postcodesResponse = @file_get_contents($url);
+        
+        if (empty($postcodesResponse)) {
+            return null;
+        }
+        
+        $postcodesData = json_decode($postcodesResponse, true);
+        $outcode = $postcodesData["result"]["outcode"] ?? null;
+        
+        return $outcode ? trim($outcode) : null;
+    } catch (\Exception $e) {
+        if (!empty($joinBlockLog)) {
+            $joinBlockLog->warning("Could not get outcode from postcode $postcode: " . $e->getMessage());
+        }
+        return null;
+    }
+}
 
+/**
+ * Validate postcode is within Manchester coverage area during lookup.
+ *
+ * Filters the postcode validation response to reject postcodes outside
+ * the Greater Manchester coverage area defined in the branch map.
+ *
+ * @since 0.1.0
+ *
+ * @param array           $response  Initial response array.
+ * @param string          $postcode  The postcode being validated.
+ * @param array           $addresses Available addresses from lookup.
+ * @param WP_REST_Request $request   The full request object.
+ * @return array Modified response array, or error array with 'status' and 'message' keys.
+ */
+add_filter("ck_join_flow_postcode_validation", function ($response, $postcode, $addresses, $request) use ($branchMap, $outOfAreaLookupMessage) {
+    $outcode = gmtu_get_postcode_outcode($postcode);
+    
+    if (!$outcode) {
+        // If we can't determine outcode, allow through
+        return $response;
+    }
+    
+    // Check if postcode exists in our branch map
+    if (!array_key_exists($outcode, $branchMap)) {
+        // Postcode not in our coverage area - return error
+        return [
+            'status' => 'bad_postcode',
+            'message' => $outOfAreaLookupMessage
+        ];
+    }
+    
+    return $response; // Allow if valid
+}, 10, 4);
+
+/**
+ * Block form submission for postcodes outside coverage area.
+ *
+ * Filters the step response to completely block form progression
+ * if the postcode is outside the Greater Manchester coverage area.
+ *
+ * @since 0.1.0
+ *
+ * @param array $response Initial response array.
+ * @param array $data     Full form submission data.
+ * @return array Modified response array, or error array with 'status' and 'message' keys.
+ */
+add_filter("ck_join_flow_step_response", function ($response, $data) use ($branchMap, $outOfAreaSubmissionMessage) {
+    $postcode = $data['addressPostcode'] ?? '';
+    $outcode = gmtu_get_postcode_outcode($postcode);
+    
+    if (!$outcode) {
+        // If we can't determine outcode, allow through
+        return $response;
+    }
+    
+    // Check if postcode exists in our branch map
+    if (!array_key_exists($outcode, $branchMap)) {
+        // Postcode not in our coverage area - block submission
+        return [
+            'status' => 'blocked',
+            'message' => $outOfAreaSubmissionMessage
+        ];
+    }
+    
+    return $response; // Allow if valid
+}, 10, 2);
+
+/**
+ * Populate "branch" custom field from postcode.
+ *
+ * Filters the join data before processing to automatically assign
+ * a branch based on the member's postcode outcode.
+ *
+ * @since 0.1.0
+ *
+ * @param array $data Join form data.
+ * @return array Modified join form data with branch assignment.
+ */
+add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
     if (!empty($data["branch"])) {
         // Don't overwrite explicitly set branch
         return $data;
@@ -104,48 +235,157 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
         return $data;
     }
 
-    $postcode = $data["addressPostcode"];
-
-    try {
-        $url = "https://api.postcodes.io/postcodes/" . rawurlencode($data["addressPostcode"]);
-        $postcodesResponse = @file_get_contents($url);
-
-        if (empty($postcodesResponse)) {
-            return $data;
-        }
-
-        $postcodesData = json_decode($postcodesResponse, true);
-
-        $outcode = $postcodesData["result"]["outcode"] ?? null;
-
-        if (!$outcode) {
-            return $data;
-        }
-
-        $data["branch"] = $branchMap[trim($outcode)] ?? null;
-
-        // Ensure "branch" custom field exists
-        $customFields = $data["customFieldsConfig"] ?? [];
-        $customField = null;
-        foreach ($data["customFieldsConfig"] as $field) {
-            if ($field["id"] === "branch") {
-                $customField = $field;
-                break;
-            }
-        }
-        if (!$customField) {
-            $customFields[] = [
-                "id" => "branch",
-                "field_type" => "text"
-            ];
-        }
-        $data["customFieldsConfig"] = $customFields;
-
-        return $data;
-    } catch (\Exception $e) {
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->warning("Could not get branch from postcode $postcode: " . $e->getMessage());
-        }
+    $outcode = gmtu_get_postcode_outcode($data["addressPostcode"]);
+    
+    if (!$outcode) {
         return $data;
     }
+
+    $data["branch"] = $branchMap[$outcode] ?? null;
+
+    // Ensure "branch" custom field exists
+    $customFields = $data["customFieldsConfig"] ?? [];
+    $customField = null;
+    foreach ($data["customFieldsConfig"] as $field) {
+        if ($field["id"] === "branch") {
+            $customField = $field;
+            break;
+        }
+    }
+    if (!$customField) {
+        $customFields[] = [
+            "id" => "branch",
+            "field_type" => "text"
+        ];
+    }
+    $data["customFieldsConfig"] = $customFields;
+
+    return $data;
 });
+
+/**
+ * Get formatted member details from registration data.
+ *
+ * @since 0.1.0
+ *
+ * @param array $data Registration data.
+ * @return array Member details array with keys: name, email, postcode, branch.
+ */
+function gmtu_get_member_details($data) {
+    return [
+        'name' => trim(($data['firstName'] ?? '') . ' ' . ($data['lastName'] ?? '')),
+        'email' => $data['email'] ?? 'N/A',
+        'postcode' => $data['addressPostcode'] ?? 'N/A',
+        'branch' => $data['branch'] ?? null,
+    ];
+}
+
+/**
+ * Build email body with member details.
+ *
+ * @since 0.1.0
+ *
+ * @param string $introMessage       Introductory message.
+ * @param array  $memberDetails      Member details array.
+ * @param bool   $includeZetkinLink  Optional. Whether to include Zetkin authorization link. Default true.
+ * @return string Formatted email body.
+ */
+function gmtu_build_email_body($introMessage, $memberDetails, $includeZetkinLink = true) {
+    $emailBody = $introMessage . "\n\n";
+    $emailBody .= "Member Details:\n";
+    $emailBody .= "Name: " . $memberDetails['name'] . "\n";
+    $emailBody .= "Email: " . $memberDetails['email'] . "\n";
+    $emailBody .= "Postcode: " . $memberDetails['postcode'] . "\n";
+    if ($memberDetails['branch']) {
+        $emailBody .= "Branch: " . $memberDetails['branch'] . "\n";
+    }
+    
+    if ($includeZetkinLink) {
+        $emailBody .= "\nBefore the new member can be found in Zetkin, they need to be authorised. It takes two seconds.\n";
+        $emailBody .= "https://app.zetkin.org/organize/1050/people/incoming\n";
+    }
+    
+    return $emailBody;
+}
+
+/**
+ * Send notification emails to multiple recipients.
+ *
+ * @since 0.1.0
+ *
+ * @param array  $recipients Email addresses to send to.
+ * @param string $subject    Email subject.
+ * @param string $body       Email body.
+ * @return void
+ */
+function gmtu_send_notification_emails($recipients, $subject, $body) {
+    foreach ($recipients as $recipient) {
+        wp_mail($recipient, $subject, $body);
+    }
+}
+
+/**
+ * Send general notification email on successful registration.
+ *
+ * Fires when a member successfully completes registration,
+ * sending a notification to the configured admin email addresses.
+ *
+ * @since 0.1.0
+ *
+ * @param array $data Registration data including member details.
+ */
+add_action("ck_join_flow_success", function ($data) use ($successNotificationEmails, $successNotificationSubject, $successNotificationMessage) {
+    if (empty($successNotificationEmails)) {
+        return;
+    }
+    
+    $memberDetails = gmtu_get_member_details($data);
+    $memberDetails['branch'] = $memberDetails['branch'] ?? 'N/A'; // Show 'N/A' instead of null in general notification
+    $emailBody = gmtu_build_email_body($successNotificationMessage, $memberDetails);
+    
+    gmtu_send_notification_emails($successNotificationEmails, $successNotificationSubject, $emailBody);
+}, 10, 1);
+
+/**
+ * Send branch-specific notification email.
+ *
+ * Fires when a member successfully completes registration,
+ * sending a notification to the assigned branch or alerting
+ * admins if no branch email is configured.
+ *
+ * @since 0.1.0
+ *
+ * @param array $data Registration data including member details.
+ */
+add_action("ck_join_flow_success", function ($data) use ($branchEmailMap, $successNotificationEmails) {
+    $memberDetails = gmtu_get_member_details($data);
+    $memberBranch = $memberDetails['branch'];
+    
+    // If no branch assigned, notify admin
+    if (empty($memberBranch)) {
+        if (!empty($successNotificationEmails)) {
+            $intro = "A new member has joined but no branch was assigned.\n\nPlease review and assign a branch manually.";
+            $emailBody = gmtu_build_email_body($intro, $memberDetails);
+            gmtu_send_notification_emails($successNotificationEmails, 'GMTU Member Registration - No Branch Assigned', $emailBody);
+        }
+        return;
+    }
+    
+    // Check if branch has an email configured
+    $branchEmail = $branchEmailMap[$memberBranch] ?? null;
+    
+    if (empty($branchEmail)) {
+        // No email configured for this branch, notify admin
+        if (!empty($successNotificationEmails)) {
+            $intro = "A new member has joined the {$memberBranch} branch, but no email is configured for this branch.\n\nPlease configure a branch email or contact the branch directly.";
+            $emailBody = gmtu_build_email_body($intro, $memberDetails);
+            gmtu_send_notification_emails($successNotificationEmails, "GMTU Member Registration - No Email for {$memberBranch}", $emailBody);
+        }
+        return;
+    }
+    
+    // Send notification to branch
+    $intro = "A new member has joined your branch!";
+    $emailBody = gmtu_build_email_body($intro, $memberDetails);
+    wp_mail($branchEmail, "New Member Joined {$memberBranch} Branch", $emailBody);
+}, 20, 1);
