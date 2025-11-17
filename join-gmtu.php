@@ -244,23 +244,6 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
 
     $data["branch"] = $branchMap[$outcode] ?? null;
 
-    // Ensure "branch" custom field exists
-    $customFields = $data["customFieldsConfig"] ?? [];
-    $customField = null;
-    foreach ($data["customFieldsConfig"] as $field) {
-        if ($field["id"] === "branch") {
-            $customField = $field;
-            break;
-        }
-    }
-    if (!$customField) {
-        $customFields[] = [
-            "id" => "branch",
-            "field_type" => "text"
-        ];
-    }
-    $data["customFieldsConfig"] = $customFields;
-
     return $data;
 });
 
