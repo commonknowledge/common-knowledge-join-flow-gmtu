@@ -4,7 +4,7 @@
  * Plugin Name:     Common Knowledge Join Flow GMTU Extensions
  * Description:     Common Knowledge join flow plugin GMTU extensions.
  * Version:         1.0.0
- * Author:          Common Knowledge <hello@commonknowledge.coop>
+ * Author:          GMTU <membership@tenantsunion.org.uk>
  * Text Domain:     common-knowledge-join-flow
  * License: GPLv2 or later
  */
