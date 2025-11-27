@@ -3,7 +3,7 @@
 /**
  * Plugin Name:     Common Knowledge Join Flow GMTU Extensions
  * Description:     Common Knowledge join flow plugin GMTU extensions.
- * Version:         1.0.0
+ * Version:         1.0.1
  * Author:          Common Knowledge <hello@commonknowledge.coop>
  * Text Domain:     common-knowledge-join-flow
  * License: GPLv2 or later
@@ -227,6 +227,8 @@ add_filter("ck_join_flow_step_response", function ($response, $data) use ($branc
  * @return array Modified join form data with branch assignment.
  */
 add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
+    global $joinBlockLog;
+
     if (!empty($data["branch"])) {
         // Don't overwrite explicitly set branch
         return $data;
@@ -236,32 +238,53 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
         return $data;
     }
 
-    $outcode = gmtu_get_postcode_outcode($data["addressPostcode"]);
+    $postcode = $data["addressPostcode"];
+    $outcode = gmtu_get_postcode_outcode($postcode);
     
     if (!$outcode) {
-        return $data;
+        if (!empty($joinBlockLog)) {
+            $joinBlockLog->warning("Could not determine outcode from postcode: $postcode");
+        }
+            return $data;
+        }
+
+    $branch = $branchMap[$outcode] ?? null;
+    $data["branch"] = $branch;
+    
+    if (!empty($joinBlockLog)) {
+        if ($branch) {
+            $joinBlockLog->info("Assigned branch '$branch' for postcode $postcode (outcode: $outcode)");
+        } else if (array_key_exists($outcode, $branchMap)) {
+            $joinBlockLog->info("Outcode $outcode in branch map but no branch assigned (null value) for postcode $postcode");
+        } else {
+            $joinBlockLog->warning("Outcode $outcode not found in branch map for postcode $postcode");
+        }
     }
 
-    $data["branch"] = $branchMap[$outcode] ?? null;
-
-    // Ensure "branch" custom field exists
+    // Ensure "branch" custom field exists in config
     $customFields = $data["customFieldsConfig"] ?? [];
-    $customField = null;
-    foreach ($data["customFieldsConfig"] as $field) {
+    $customFieldExists = false;
+    foreach ($customFields as $field) {
         if ($field["id"] === "branch") {
-            $customField = $field;
+            $customFieldExists = true;
             break;
         }
     }
-    if (!$customField) {
+    if (!$customFieldExists) {
         $customFields[] = [
             "id" => "branch",
             "field_type" => "text"
         ];
     }
     $data["customFieldsConfig"] = $customFields;
+    
+    // Also set the branch value in the custom fields data
+    if (!isset($data["customFields"])) {
+        $data["customFields"] = [];
+    }
+    $data["customFields"]["branch"] = $branch;
 
-    return $data;
+        return $data;
 });
 
 /**
@@ -303,14 +326,31 @@ add_filter('ck_join_flow_add_tags', function ($addTags, $data, $service) {
  * @since 0.1.0
  *
  * @param array $data Registration data.
- * @return array Member details array with keys: name, email, postcode, branch.
+ * @return array Member details array with keys: name, email, postcode, branch, payment_level.
  */
 function gmtu_get_member_details($data) {
+    // Format payment level
+    $paymentLevel = 'N/A';
+    if (!empty($data['membershipPlan'])) {
+        $plan = $data['membershipPlan'];
+        $amount = $plan['amount'] ?? 0;
+        $currency = $plan['currency'] ?? 'GBP';
+        $frequency = $plan['frequency'] ?? '';
+        
+        $currencySymbol = $currency === 'GBP' ? '£' : $currency;
+        $paymentLevel = $currencySymbol . number_format($amount / 100, 2);
+        
+        if ($frequency) {
+            $paymentLevel .= ' / ' . $frequency;
+        }
+    }
+    
     return [
         'name' => trim(($data['firstName'] ?? '') . ' ' . ($data['lastName'] ?? '')),
         'email' => $data['email'] ?? 'N/A',
         'postcode' => $data['addressPostcode'] ?? 'N/A',
         'branch' => $data['branch'] ?? null,
+        'payment_level' => $paymentLevel,
     ];
 }
 
@@ -331,6 +371,7 @@ function gmtu_build_email_body($introMessage, $memberDetails, $includeZetkinLink
     $emailBody .= "Email: " . $memberDetails['email'] . "\n";
     $emailBody .= "Postcode: " . $memberDetails['postcode'] . "\n";
     $emailBody .= "Branch: " . ($memberDetails['branch'] ?: 'No branch found') . "\n";
+    $emailBody .= "Payment Level: " . $memberDetails['payment_level'] . "\n";
     
     if ($includeZetkinLink) {
         $emailBody .= "\nBefore the new member can be found in Zetkin, they need to be authorised. It takes two seconds.\n";
