@@ -3,7 +3,7 @@
 /**
  * Plugin Name:     Common Knowledge Join Flow GMTU Extensions
  * Description:     Common Knowledge join flow plugin GMTU extensions.
- * Version:         1.0.1
+ * Version:         1.1.0
  * Author:          Common Knowledge <hello@commonknowledge.coop>
  * Text Domain:     common-knowledge-join-flow
  * License: GPLv2 or later
@@ -16,7 +16,7 @@ $outOfAreaLookupMessage = "<p>Sorry, this postcode is outside of Greater Manches
 $outOfAreaSubmissionMessage = '<h3>Sorry</h3><p>We’re only able to support tenants living in the Greater Manchester area.</p><p>If you’re based elsewhere in the UK, there are other local tenant unions that may be able to help, and for urgent housing issues you can also contact <a href="https://www.shelter.org.uk/Shelter">Shelter</a> or <a href="https://www.crisis.org.uk/">Crisis</a>.</p><p>We’re sorry we can’t assist directly, but we hope you can get the support you need quickly.</p>';
 
 // Success notification settings
-$successNotificationEmails = ['hello@commonknowledge.coop', 'info@tenantsunion.org.uk'];
+$successNotificationEmails = ['alex@commonknowledge.coop', 'membership@tenantsunion.org.uk'];
 $successNotificationSubject = 'New GMTU Member Registration';
 $successNotificationMessage = 'A new member has successfully registered through the join flow.';
 
