@@ -538,16 +538,12 @@ function gmtu_send_notification_emails($recipients, $subject, $body) {
  * @param array $data Registration data including member details.
  */
 add_action("ck_join_flow_success", function ($data) use ($successNotificationEmails, $successNotificationSubject, $successNotificationMessage) {
-    global $joinBlockLog;
-    
-    if (!empty($joinBlockLog)) {
-        $joinBlockLog->info("=== ck_join_flow_success ACTION (priority 10) START ===");
-        $joinBlockLog->info("Data keys: " . implode(", ", array_keys($data)));
-        $joinBlockLog->info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
-        $joinBlockLog->info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
-        $joinBlockLog->info("MembershipPlan in data: " . (isset($data['membershipPlan']) ? json_encode($data['membershipPlan']) : "NOT SET"));
-        $joinBlockLog->info("Full data received: " . json_encode($data));
-    }
+    gmtu_log_info("=== ck_join_flow_success ACTION (priority 10) START ===");
+    gmtu_log_info("Data keys: " . implode(", ", array_keys($data)));
+    gmtu_log_info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
+    gmtu_log_info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+    gmtu_log_info("MembershipPlan in data: " . (isset($data['membershipPlan']) ? json_encode($data['membershipPlan']) : "NOT SET"));
+    gmtu_log_info("Full data received: " . json_encode($data));
     
     if (empty($successNotificationEmails)) {
         return;
@@ -571,16 +567,12 @@ add_action("ck_join_flow_success", function ($data) use ($successNotificationEma
  * @param array $data Registration data including member details.
  */
 add_action("ck_join_flow_success", function ($data) use ($branchEmailMap, $successNotificationEmails) {
-    global $joinBlockLog;
-    
-    if (!empty($joinBlockLog)) {
-        $joinBlockLog->info("=== ck_join_flow_success ACTION (priority 20) START ===");
-        $joinBlockLog->info("Data keys: " . implode(", ", array_keys($data)));
-        $joinBlockLog->info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
-        $joinBlockLog->info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
-        $joinBlockLog->info("MembershipPlan in data: " . (isset($data['membershipPlan']) ? json_encode($data['membershipPlan']) : "NOT SET"));
-        $joinBlockLog->info("Full data received: " . json_encode($data));
-    }
+    gmtu_log_info("=== ck_join_flow_success ACTION (priority 20) START ===");
+    gmtu_log_info("Data keys: " . implode(", ", array_keys($data)));
+    gmtu_log_info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
+    gmtu_log_info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+    gmtu_log_info("MembershipPlan in data: " . (isset($data['membershipPlan']) ? json_encode($data['membershipPlan']) : "NOT SET"));
+    gmtu_log_info("Full data received: " . json_encode($data));
     
     $memberDetails = gmtu_get_member_details($data);
     $memberBranch = $memberDetails['branch'];
