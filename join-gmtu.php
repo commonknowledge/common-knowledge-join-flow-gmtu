@@ -231,6 +231,9 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
     
     if (!empty($data["branch"])) {
         // Don't overwrite explicitly set branch
+        if (!empty($joinBlockLog)) {
+            $joinBlockLog->info("Branch already set, returning early: " . $data["branch"]);
+        }
         return $data;
     }
     
@@ -283,6 +286,15 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
         $data["customFields"] = [];
     }
     $data["customFields"]["branch"] = $branch;
+
+    if (!empty($joinBlockLog)) {
+        $joinBlockLog->info("=== ck_join_flow_pre_handle_join FILTER END ===");
+        $joinBlockLog->info("Branch set to: " . ($branch ?? "NULL"));
+        $joinBlockLog->info("data['branch']: " . ($data["branch"] ?? "NOT SET"));
+        $joinBlockLog->info("data['customFields']['branch']: " . ($data["customFields"]["branch"] ?? "NOT SET"));
+        $joinBlockLog->info("MembershipPlan still present: " . (isset($data["membershipPlan"]) ? "YES - " . json_encode($data["membershipPlan"]) : "NO"));
+        $joinBlockLog->info("Full outgoing data: " . json_encode($data));
+    }
     
     return $data;
 });
@@ -302,6 +314,14 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
  */
 add_filter('ck_join_flow_add_tags', function ($addTags, $data, $service) {
     global $joinBlockLog;
+    
+    if (!empty($joinBlockLog)) {
+        $joinBlockLog->info("=== ck_join_flow_add_tags FILTER for $service ===");
+        $joinBlockLog->info("Data keys: " . implode(", ", array_keys($data)));
+        $joinBlockLog->info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
+        $joinBlockLog->info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+        $joinBlockLog->info("Full data structure: " . json_encode($data));
+    }
     
     $branch = $data['branch'] ?? null;
     $memberEmail = $data['email'] ?? 'unknown';
@@ -329,27 +349,113 @@ add_filter('ck_join_flow_add_tags', function ($addTags, $data, $service) {
  * @return array Member details array with keys: name, email, postcode, branch, payment_level.
  */
 function gmtu_get_member_details($data) {
+    global $joinBlockLog, $branchMap;
+    
+    if (!empty($joinBlockLog)) {
+        $joinBlockLog->info("=== gmtu_get_member_details FUNCTION START ===");
+        $joinBlockLog->info("Data keys: " . implode(", ", array_keys($data)));
+        $joinBlockLog->info("Checking branch in multiple locations:");
+        $joinBlockLog->info("  - data['branch']: " . ($data['branch'] ?? "NOT SET"));
+        $joinBlockLog->info("  - data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+        $joinBlockLog->info("Checking membershipPlan:");
+        $joinBlockLog->info("  - data['membershipPlan'] exists: " . (isset($data['membershipPlan']) ? "YES" : "NO"));
+        if (isset($data['membershipPlan'])) {
+            $joinBlockLog->info("  - data['membershipPlan']: " . json_encode($data['membershipPlan']));
+        }
+        $joinBlockLog->info("Available plan data: planId=" . ($data['planId'] ?? "NOT SET") . ", membership=" . ($data['membership'] ?? "NOT SET"));
+        $joinBlockLog->info("Full data structure: " . json_encode($data));
+    }
+    
+    // Try to get branch from multiple possible locations
+    $branch = $data['branch'] ?? $data['customFields']['branch'] ?? null;
+    
+    // If branch not found, recalculate from postcode
+    if (empty($branch) && !empty($data['addressPostcode'])) {
+        if (!empty($joinBlockLog)) {
+            $joinBlockLog->info("Branch not found in data, recalculating from postcode: " . $data['addressPostcode']);
+        }
+        $postcode = $data['addressPostcode'];
+        $outcode = gmtu_get_postcode_outcode($postcode);
+        
+        if ($outcode && isset($branchMap[$outcode])) {
+            $branch = $branchMap[$outcode];
+            if (!empty($joinBlockLog)) {
+                $joinBlockLog->info("Recalculated branch from postcode: $branch (outcode: $outcode)");
+            }
+        } else {
+            if (!empty($joinBlockLog)) {
+                $joinBlockLog->warning("Could not recalculate branch from postcode: $postcode (outcode: " . ($outcode ?? "NULL") . ")");
+            }
+        }
+    }
+    
+    // Try to get or construct membershipPlan
+    $membershipPlan = $data['membershipPlan'] ?? null;
+    
+    // If membershipPlan is not available, try to construct it from available data
+    if (empty($membershipPlan)) {
+        // Check if we have planId or membership to work with
+        $planId = $data['planId'] ?? $data['membership'] ?? null;
+        if (!empty($planId)) {
+            if (!empty($joinBlockLog)) {
+                $joinBlockLog->info("Constructing membershipPlan from planId/membership: $planId");
+            }
+            // Create a basic plan structure - the actual amount/frequency might need to be looked up
+            // For now, we'll just note the plan ID
+            $membershipPlan = [
+                'id' => $planId,
+                'name' => $planId,
+            ];
+        }
+    }
+    
     // Format payment level
     $paymentLevel = 'N/A';
-    if (!empty($data['membershipPlan'])) {
-        $plan = $data['membershipPlan'];
+
+    if (!empty($membershipPlan)) {
+        $plan = $membershipPlan;
         $amount = $plan['amount'] ?? 0;
         $currency = $plan['currency'] ?? 'GBP';
         $frequency = $plan['frequency'] ?? '';
         
-        $currencySymbol = $currency === 'GBP' ? '£' : $currency;
-        $paymentLevel = $currencySymbol . number_format($amount / 100, 2);
-        
-        if ($frequency) {
-            $paymentLevel .= ' / ' . $frequency;
+        // If we have amount, format it
+        if ($amount > 0) {
+            $currencySymbol = $currency === 'GBP' ? '£' : $currency;
+            $paymentLevel = $currencySymbol . number_format($amount / 100, 2);
+            
+            if ($frequency) {
+                $paymentLevel .= ' / ' . $frequency;
+            }
+        } else {
+            // Just show the plan name if we don't have amount
+            $paymentLevel = $plan['name'] ?? $plan['id'] ?? 'Plan: ' . ($data['planId'] ?? $data['membership'] ?? 'Unknown');
         }
+        
+        if (!empty($joinBlockLog)) {
+            $joinBlockLog->info("Payment level calculated: $paymentLevel");
+        }
+    } else {
+        // Fallback: try to show planId or membership
+        $fallbackPlan = $data['planId'] ?? $data['membership'] ?? null;
+        if ($fallbackPlan) {
+            $paymentLevel = 'Plan: ' . $fallbackPlan;
+        }
+        if (!empty($joinBlockLog)) {
+            $joinBlockLog->warning("No membershipPlan found in data, using fallback: $paymentLevel");
+        }
+    }
+    
+    if (!empty($joinBlockLog)) {
+        $joinBlockLog->info("Final branch value: " . ($branch ?? "NULL"));
+        $joinBlockLog->info("Final payment level: $paymentLevel");
+        $joinBlockLog->info("=== gmtu_get_member_details FUNCTION END ===");
     }
     
     return [
         'name' => trim(($data['firstName'] ?? '') . ' ' . ($data['lastName'] ?? '')),
         'email' => $data['email'] ?? 'N/A',
         'postcode' => $data['addressPostcode'] ?? 'N/A',
-        'branch' => $data['branch'] ?? null,
+        'branch' => $branch,
         'payment_level' => $paymentLevel,
     ];
 }
@@ -402,6 +508,17 @@ function gmtu_send_notification_emails($recipients, $subject, $body) {
  * @param array $data Registration data including member details.
  */
 add_action("ck_join_flow_success", function ($data) use ($successNotificationEmails, $successNotificationSubject, $successNotificationMessage) {
+    global $joinBlockLog;
+    
+    if (!empty($joinBlockLog)) {
+        $joinBlockLog->info("=== ck_join_flow_success ACTION (priority 10) START ===");
+        $joinBlockLog->info("Data keys: " . implode(", ", array_keys($data)));
+        $joinBlockLog->info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
+        $joinBlockLog->info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+        $joinBlockLog->info("MembershipPlan in data: " . (isset($data['membershipPlan']) ? json_encode($data['membershipPlan']) : "NOT SET"));
+        $joinBlockLog->info("Full data received: " . json_encode($data));
+    }
+    
     if (empty($successNotificationEmails)) {
         return;
     }
@@ -424,6 +541,17 @@ add_action("ck_join_flow_success", function ($data) use ($successNotificationEma
  * @param array $data Registration data including member details.
  */
 add_action("ck_join_flow_success", function ($data) use ($branchEmailMap, $successNotificationEmails) {
+    global $joinBlockLog;
+    
+    if (!empty($joinBlockLog)) {
+        $joinBlockLog->info("=== ck_join_flow_success ACTION (priority 20) START ===");
+        $joinBlockLog->info("Data keys: " . implode(", ", array_keys($data)));
+        $joinBlockLog->info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
+        $joinBlockLog->info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+        $joinBlockLog->info("MembershipPlan in data: " . (isset($data['membershipPlan']) ? json_encode($data['membershipPlan']) : "NOT SET"));
+        $joinBlockLog->info("Full data received: " . json_encode($data));
+    }
+    
     $memberDetails = gmtu_get_member_details($data);
     $memberBranch = $memberDetails['branch'];
     
