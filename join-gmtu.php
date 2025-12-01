@@ -114,6 +114,48 @@ $branchMap = [
 ];
 
 /**
+ * Get the join block log instance if available.
+ *
+ * @since 1.1.0
+ *
+ * @return object|null The log instance or null if not available.
+ */
+function gmtu_get_log() {
+    global $joinBlockLog;
+    return !empty($joinBlockLog) ? $joinBlockLog : null;
+}
+
+/**
+ * Log an info message if logging is available.
+ *
+ * @since 1.1.0
+ *
+ * @param string $message The message to log.
+ * @return void
+ */
+function gmtu_log_info($message) {
+    $log = gmtu_get_log();
+    if ($log) {
+        $log->info($message);
+    }
+}
+
+/**
+ * Log a warning message if logging is available.
+ *
+ * @since 1.1.0
+ *
+ * @param string $message The message to log.
+ * @return void
+ */
+function gmtu_log_warning($message) {
+    $log = gmtu_get_log();
+    if ($log) {
+        $log->warning($message);
+    }
+}
+
+/**
  * Get outcode from postcode using postcodes.io API.
  *
  * Uses WordPress transients to cache results for 7 days to avoid expensive API calls.
@@ -124,8 +166,6 @@ $branchMap = [
  * @return string|null The outcode or null if not found/error.
  */
 function gmtu_get_postcode_outcode($postcode) {
-    global $joinBlockLog;
-    
     if (empty($postcode)) {
         return null;
     }
@@ -137,16 +177,12 @@ function gmtu_get_postcode_outcode($postcode) {
     // Try to get from cache first
     $cachedOutcode = get_transient($cacheKey);
     if ($cachedOutcode !== false) {
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->info("Postcode outcode cache hit for: $postcode -> $cachedOutcode");
-        }
+        gmtu_log_info("Postcode outcode cache hit for: $postcode -> $cachedOutcode");
         return $cachedOutcode;
     }
     
     // Cache miss - fetch from API
-    if (!empty($joinBlockLog)) {
-        $joinBlockLog->info("Postcode outcode cache miss, fetching from API: $postcode");
-    }
+    gmtu_log_info("Postcode outcode cache miss, fetching from API: $postcode");
     
     try {
         $url = "https://api.postcodes.io/postcodes/" . rawurlencode($postcode);
@@ -166,16 +202,12 @@ function gmtu_get_postcode_outcode($postcode) {
             // Postcodes don't change, so a long cache is safe
             set_transient($cacheKey, $outcode, 7 * DAY_IN_SECONDS);
             
-            if (!empty($joinBlockLog)) {
-                $joinBlockLog->info("Cached postcode outcode: $postcode -> $outcode");
-            }
+            gmtu_log_info("Cached postcode outcode: $postcode -> $outcode");
         }
         
         return $outcode;
     } catch (\Exception $e) {
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->warning("Could not get outcode from postcode $postcode: " . $e->getMessage());
-        }
+        gmtu_log_warning("Could not get outcode from postcode $postcode: " . $e->getMessage());
         return null;
     }
 }
@@ -259,13 +291,9 @@ add_filter("ck_join_flow_step_response", function ($response, $data) use ($branc
  * @return array Modified join form data with branch assignment.
  */
 add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
-    global $joinBlockLog;
-    
     if (!empty($data["branch"])) {
         // Don't overwrite explicitly set branch
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->info("Branch already set, returning early: " . $data["branch"]);
-        }
+        gmtu_log_info("Branch already set, returning early: " . $data["branch"]);
         return $data;
     }
     
@@ -277,23 +305,19 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
     $outcode = gmtu_get_postcode_outcode($postcode);
     
     if (!$outcode) {
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->warning("Could not determine outcode from postcode: $postcode");
-        }
+        gmtu_log_warning("Could not determine outcode from postcode: $postcode");
         return $data;
     }
     
     $branch = $branchMap[$outcode] ?? null;
     $data["branch"] = $branch;
     
-    if (!empty($joinBlockLog)) {
-        if ($branch) {
-            $joinBlockLog->info("Assigned branch '$branch' for postcode $postcode (outcode: $outcode)");
-        } else if (array_key_exists($outcode, $branchMap)) {
-            $joinBlockLog->info("Outcode $outcode in branch map but no branch assigned (null value) for postcode $postcode");
-        } else {
-            $joinBlockLog->warning("Outcode $outcode not found in branch map for postcode $postcode");
-        }
+    if ($branch) {
+        gmtu_log_info("Assigned branch '$branch' for postcode $postcode (outcode: $outcode)");
+    } else if (array_key_exists($outcode, $branchMap)) {
+        gmtu_log_info("Outcode $outcode in branch map but no branch assigned (null value) for postcode $postcode");
+    } else {
+        gmtu_log_warning("Outcode $outcode not found in branch map for postcode $postcode");
     }
     
     // Ensure "branch" custom field exists in config
@@ -319,14 +343,12 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
     }
     $data["customFields"]["branch"] = $branch;
 
-    if (!empty($joinBlockLog)) {
-        $joinBlockLog->info("=== ck_join_flow_pre_handle_join FILTER END ===");
-        $joinBlockLog->info("Branch set to: " . ($branch ?? "NULL"));
-        $joinBlockLog->info("data['branch']: " . ($data["branch"] ?? "NOT SET"));
-        $joinBlockLog->info("data['customFields']['branch']: " . ($data["customFields"]["branch"] ?? "NOT SET"));
-        $joinBlockLog->info("MembershipPlan still present: " . (isset($data["membershipPlan"]) ? "YES - " . json_encode($data["membershipPlan"]) : "NO"));
-        $joinBlockLog->info("Full outgoing data: " . json_encode($data));
-    }
+    gmtu_log_info("=== ck_join_flow_pre_handle_join FILTER END ===");
+    gmtu_log_info("Branch set to: " . ($branch ?? "NULL"));
+    gmtu_log_info("data['branch']: " . ($data["branch"] ?? "NOT SET"));
+    gmtu_log_info("data['customFields']['branch']: " . ($data["customFields"]["branch"] ?? "NOT SET"));
+    gmtu_log_info("MembershipPlan still present: " . (isset($data["membershipPlan"]) ? "YES - " . json_encode($data["membershipPlan"]) : "NO"));
+    gmtu_log_info("Full outgoing data: " . json_encode($data));
     
     return $data;
 });
@@ -345,28 +367,20 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
  * @return array Modified tags array with branch added.
  */
 add_filter('ck_join_flow_add_tags', function ($addTags, $data, $service) {
-    global $joinBlockLog;
-    
-    if (!empty($joinBlockLog)) {
-        $joinBlockLog->info("=== ck_join_flow_add_tags FILTER for $service ===");
-        $joinBlockLog->info("Data keys: " . implode(", ", array_keys($data)));
-        $joinBlockLog->info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
-        $joinBlockLog->info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
-        $joinBlockLog->info("Full data structure: " . json_encode($data));
-    }
+    gmtu_log_info("=== ck_join_flow_add_tags FILTER for $service ===");
+    gmtu_log_info("Data keys: " . implode(", ", array_keys($data)));
+    gmtu_log_info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
+    gmtu_log_info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+    gmtu_log_info("Full data structure: " . json_encode($data));
     
     $branch = $data['branch'] ?? null;
     $memberEmail = $data['email'] ?? 'unknown';
     
     if (!empty($branch)) {
         $addTags[] = $branch;
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->info("Added branch tag '$branch' to $service for member $memberEmail");
-        }
+        gmtu_log_info("Added branch tag '$branch' to $service for member $memberEmail");
     } else {
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->warning("No branch found for member $memberEmail when tagging in $service");
-        }
+        gmtu_log_warning("No branch found for member $memberEmail when tagging in $service");
     }
     
     return $addTags;
@@ -381,43 +395,35 @@ add_filter('ck_join_flow_add_tags', function ($addTags, $data, $service) {
  * @return array Member details array with keys: name, email, postcode, branch, payment_level.
  */
 function gmtu_get_member_details($data) {
-    global $joinBlockLog, $branchMap;
+    global $branchMap;
     
-    if (!empty($joinBlockLog)) {
-        $joinBlockLog->info("=== gmtu_get_member_details FUNCTION START ===");
-        $joinBlockLog->info("Data keys: " . implode(", ", array_keys($data)));
-        $joinBlockLog->info("Checking branch in multiple locations:");
-        $joinBlockLog->info("  - data['branch']: " . ($data['branch'] ?? "NOT SET"));
-        $joinBlockLog->info("  - data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
-        $joinBlockLog->info("Checking membershipPlan:");
-        $joinBlockLog->info("  - data['membershipPlan'] exists: " . (isset($data['membershipPlan']) ? "YES" : "NO"));
-        if (isset($data['membershipPlan'])) {
-            $joinBlockLog->info("  - data['membershipPlan']: " . json_encode($data['membershipPlan']));
-        }
-        $joinBlockLog->info("Available plan data: planId=" . ($data['planId'] ?? "NOT SET") . ", membership=" . ($data['membership'] ?? "NOT SET"));
-        $joinBlockLog->info("Full data structure: " . json_encode($data));
+    gmtu_log_info("=== gmtu_get_member_details FUNCTION START ===");
+    gmtu_log_info("Data keys: " . implode(", ", array_keys($data)));
+    gmtu_log_info("Checking branch in multiple locations:");
+    gmtu_log_info("  - data['branch']: " . ($data['branch'] ?? "NOT SET"));
+    gmtu_log_info("  - data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+    gmtu_log_info("Checking membershipPlan:");
+    gmtu_log_info("  - data['membershipPlan'] exists: " . (isset($data['membershipPlan']) ? "YES" : "NO"));
+    if (isset($data['membershipPlan'])) {
+        gmtu_log_info("  - data['membershipPlan']: " . json_encode($data['membershipPlan']));
     }
+    gmtu_log_info("Available plan data: planId=" . ($data['planId'] ?? "NOT SET") . ", membership=" . ($data['membership'] ?? "NOT SET"));
+    gmtu_log_info("Full data structure: " . json_encode($data));
     
     // Try to get branch from multiple possible locations
     $branch = $data['branch'] ?? $data['customFields']['branch'] ?? null;
     
     // If branch not found, recalculate from postcode
     if (empty($branch) && !empty($data['addressPostcode'])) {
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->info("Branch not found in data, recalculating from postcode: " . $data['addressPostcode']);
-        }
+        gmtu_log_info("Branch not found in data, recalculating from postcode: " . $data['addressPostcode']);
         $postcode = $data['addressPostcode'];
         $outcode = gmtu_get_postcode_outcode($postcode);
         
         if ($outcode && isset($branchMap[$outcode])) {
             $branch = $branchMap[$outcode];
-            if (!empty($joinBlockLog)) {
-                $joinBlockLog->info("Recalculated branch from postcode: $branch (outcode: $outcode)");
-            }
+            gmtu_log_info("Recalculated branch from postcode: $branch (outcode: $outcode)");
         } else {
-            if (!empty($joinBlockLog)) {
-                $joinBlockLog->warning("Could not recalculate branch from postcode: $postcode (outcode: " . ($outcode ?? "NULL") . ")");
-            }
+            gmtu_log_warning("Could not recalculate branch from postcode: $postcode (outcode: " . ($outcode ?? "NULL") . ")");
         }
     }
     
@@ -429,9 +435,7 @@ function gmtu_get_member_details($data) {
         // Check if we have planId or membership to work with
         $planId = $data['planId'] ?? $data['membership'] ?? null;
         if (!empty($planId)) {
-            if (!empty($joinBlockLog)) {
-                $joinBlockLog->info("Constructing membershipPlan from planId/membership: $planId");
-            }
+            gmtu_log_info("Constructing membershipPlan from planId/membership: $planId");
             // Create a basic plan structure - the actual amount/frequency might need to be looked up
             // For now, we'll just note the plan ID
             $membershipPlan = [
@@ -463,25 +467,19 @@ function gmtu_get_member_details($data) {
             $paymentLevel = $plan['name'] ?? $plan['id'] ?? 'Plan: ' . ($data['planId'] ?? $data['membership'] ?? 'Unknown');
         }
         
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->info("Payment level calculated: $paymentLevel");
-        }
+        gmtu_log_info("Payment level calculated: $paymentLevel");
     } else {
         // Fallback: try to show planId or membership
         $fallbackPlan = $data['planId'] ?? $data['membership'] ?? null;
         if ($fallbackPlan) {
             $paymentLevel = 'Plan: ' . $fallbackPlan;
         }
-        if (!empty($joinBlockLog)) {
-            $joinBlockLog->warning("No membershipPlan found in data, using fallback: $paymentLevel");
-        }
+        gmtu_log_warning("No membershipPlan found in data, using fallback: $paymentLevel");
     }
     
-    if (!empty($joinBlockLog)) {
-        $joinBlockLog->info("Final branch value: " . ($branch ?? "NULL"));
-        $joinBlockLog->info("Final payment level: $paymentLevel");
-        $joinBlockLog->info("=== gmtu_get_member_details FUNCTION END ===");
-    }
+    gmtu_log_info("Final branch value: " . ($branch ?? "NULL"));
+    gmtu_log_info("Final payment level: $paymentLevel");
+    gmtu_log_info("=== gmtu_get_member_details FUNCTION END ===");
     
     return [
         'name' => trim(($data['firstName'] ?? '') . ' ' . ($data['lastName'] ?? '')),
