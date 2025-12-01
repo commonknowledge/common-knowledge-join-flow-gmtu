@@ -228,16 +228,16 @@ add_filter("ck_join_flow_step_response", function ($response, $data) use ($branc
  */
 add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
     global $joinBlockLog;
-
+    
     if (!empty($data["branch"])) {
         // Don't overwrite explicitly set branch
         return $data;
     }
-
+    
     if (empty($data["addressPostcode"])) {
         return $data;
     }
-
+    
     $postcode = $data["addressPostcode"];
     $outcode = gmtu_get_postcode_outcode($postcode);
     
@@ -245,9 +245,9 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
         if (!empty($joinBlockLog)) {
             $joinBlockLog->warning("Could not determine outcode from postcode: $postcode");
         }
-            return $data;
-        }
-
+        return $data;
+    }
+    
     $branch = $branchMap[$outcode] ?? null;
     $data["branch"] = $branch;
     
@@ -260,7 +260,7 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
             $joinBlockLog->warning("Outcode $outcode not found in branch map for postcode $postcode");
         }
     }
-
+    
     // Ensure "branch" custom field exists in config
     $customFields = $data["customFieldsConfig"] ?? [];
     $customFieldExists = false;
@@ -283,8 +283,8 @@ add_filter("ck_join_flow_pre_handle_join", function ($data) use ($branchMap) {
         $data["customFields"] = [];
     }
     $data["customFields"]["branch"] = $branch;
-
-        return $data;
+    
+    return $data;
 });
 
 /**
@@ -359,12 +359,11 @@ function gmtu_get_member_details($data) {
  *
  * @since 0.1.0
  *
- * @param string $introMessage       Introductory message.
- * @param array  $memberDetails      Member details array.
- * @param bool   $includeZetkinLink  Optional. Whether to include Zetkin authorization link. Default true.
+ * @param string $introMessage  Introductory message.
+ * @param array  $memberDetails Member details array.
  * @return string Formatted email body.
  */
-function gmtu_build_email_body($introMessage, $memberDetails, $includeZetkinLink = true) {
+function gmtu_build_email_body($introMessage, $memberDetails) {
     $emailBody = $introMessage . "\n\n";
     $emailBody .= "Member Details:\n";
     $emailBody .= "Name: " . $memberDetails['name'] . "\n";
@@ -372,11 +371,6 @@ function gmtu_build_email_body($introMessage, $memberDetails, $includeZetkinLink
     $emailBody .= "Postcode: " . $memberDetails['postcode'] . "\n";
     $emailBody .= "Branch: " . ($memberDetails['branch'] ?: 'No branch found') . "\n";
     $emailBody .= "Payment Level: " . $memberDetails['payment_level'] . "\n";
-    
-    if ($includeZetkinLink) {
-        $emailBody .= "\nBefore the new member can be found in Zetkin, they need to be authorised. It takes two seconds.\n";
-        $emailBody .= "https://app.zetkin.org/organize/1050/people/incoming\n";
-    }
     
     return $emailBody;
 }
