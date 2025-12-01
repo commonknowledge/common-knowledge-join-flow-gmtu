@@ -116,6 +116,8 @@ $branchMap = [
 /**
  * Get outcode from postcode using postcodes.io API.
  *
+ * Uses WordPress transients to cache results for 7 days to avoid expensive API calls.
+ *
  * @since 0.1.0
  *
  * @param string $postcode The postcode to lookup.
@@ -126,6 +128,24 @@ function gmtu_get_postcode_outcode($postcode) {
     
     if (empty($postcode)) {
         return null;
+    }
+    
+    // Normalize postcode for cache key (uppercase, remove spaces)
+    $normalizedPostcode = strtoupper(str_replace(' ', '', trim($postcode)));
+    $cacheKey = 'gmtu_postcode_outcode_' . md5($normalizedPostcode);
+    
+    // Try to get from cache first
+    $cachedOutcode = get_transient($cacheKey);
+    if ($cachedOutcode !== false) {
+        if (!empty($joinBlockLog)) {
+            $joinBlockLog->info("Postcode outcode cache hit for: $postcode -> $cachedOutcode");
+        }
+        return $cachedOutcode;
+    }
+    
+    // Cache miss - fetch from API
+    if (!empty($joinBlockLog)) {
+        $joinBlockLog->info("Postcode outcode cache miss, fetching from API: $postcode");
     }
     
     try {
@@ -139,7 +159,19 @@ function gmtu_get_postcode_outcode($postcode) {
         $postcodesData = json_decode($postcodesResponse, true);
         $outcode = $postcodesData["result"]["outcode"] ?? null;
         
-        return $outcode ? trim($outcode) : null;
+        if ($outcode) {
+            $outcode = trim($outcode);
+            
+            // Cache the result for 7 days (604800 seconds)
+            // Postcodes don't change, so a long cache is safe
+            set_transient($cacheKey, $outcode, 7 * DAY_IN_SECONDS);
+            
+            if (!empty($joinBlockLog)) {
+                $joinBlockLog->info("Cached postcode outcode: $postcode -> $outcode");
+            }
+        }
+        
+        return $outcode;
     } catch (\Exception $e) {
         if (!empty($joinBlockLog)) {
             $joinBlockLog->warning("Could not get outcode from postcode $postcode: " . $e->getMessage());
