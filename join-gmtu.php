@@ -3,15 +3,15 @@
 /**
  * Plugin Name:     Common Knowledge Join Flow GMTU Extensions
  * Description:     Common Knowledge join flow plugin GMTU extensions.
- * Version:         1.1.0
+ * Version:         1.2.0
  * Author:          Common Knowledge <hello@commonknowledge.coop>
  * Text Domain:     common-knowledge-join-flow
  * License: GPLv2 or later
  */
 
-if (! defined('ABSPATH')) exit; // Exit if accessed directly
+ namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
 
-namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
+if (! defined('ABSPATH')) exit; // Exit if accessed directly
 
 // Error messages for out-of-area postcodes
 $outOfAreaLookupMessage = "<p>Sorry, this postcode is outside of Greater Manchester, which the union covers. You won't be able to join the union.</p>";
