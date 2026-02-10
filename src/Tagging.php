@@ -10,9 +10,6 @@
 
 namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
 
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\log_info;
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\log_warning;
-
 /**
  * Register tagging hooks.
  *
