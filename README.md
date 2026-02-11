@@ -35,3 +35,31 @@ The main configuration is in `join-gmtu.php` and includes:
 - Notification subject and message templates
 
 Branch-to-postcode mappings and branch email addresses are in `src/Branch.php`.
+
+## Local Development
+
+Requires Docker. Spins up WordPress with the parent plugin installed, this plugin mounted and activated, and Mailpit to capture outbound emails.
+
+```bash
+docker compose up -d          # start stack
+docker compose logs -f wpcli  # watch setup progress
+```
+
+| Service   | URL                          | Credentials   |
+|-----------|------------------------------|---------------|
+| WordPress | http://localhost:8080/wp-admin | admin / admin |
+| Mailpit   | http://localhost:8025          | —             |
+
+All emails sent by `wp_mail()` are captured in the Mailpit web UI.
+
+```bash
+docker compose down            # stop (keep data)
+docker compose down -v         # stop and wipe all data
+```
+
+## Tests
+
+```bash
+composer install
+composer test
+```
