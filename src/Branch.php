@@ -95,6 +95,26 @@ function get_branch_map() {
         "SK17" => null,
         "SK22" => null,
         "SK23" => null,
+        "BL1" => "Bolton",
+        "BL2" => "Bolton",
+        "BL3" => "Bolton",
+        "BL4" => "Bolton",
+        "BL5" => "Bolton",
+        "BL6" => "Bolton",
+        "BL7" => "Bolton",
+        "BL8" => null,
+        "BL9" => null,
+        "WA3" => "Wigan",
+        "WA13" => null,
+        "WA14" => null,
+        "WA15" => null,
+        "WN1" => "Wigan",
+        "WN2" => "Wigan",
+        "WN3" => "Wigan",
+        "WN4" => "Wigan",
+        "WN5" => "Wigan",
+        "WN6" => "Wigan",
+        "WN7" => "Wigan",
     ];
 }
 
@@ -117,6 +137,8 @@ function get_branch_email_map() {
         "Middleton" => 'middleton@tenantsunion.org.uk',
         "Rochdale" => 'rochdale@tenantsunion.org.uk',
         "Stockport" => null,
+        "Bolton" => null,
+        "Wigan" => null,
     ];
 }
 

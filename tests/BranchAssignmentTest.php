@@ -120,6 +120,36 @@ class BranchAssignmentTest extends TestCase
         $this->assertNull($result['branch']);
     }
 
+    public function test_assigns_null_branch_for_known_no_branch_postcode()
+    {
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
+
+        // BL8 is in the branch map but deliberately has no branch
+        Functions\when('get_transient')->justReturn('BL8');
+
+        $data = ['addressPostcode' => 'BL8 1AA'];
+        $result = $handler($data);
+        $this->assertNull($result['branch']);
+        $this->assertNull($result['customFields']['branch']);
+    }
+
+    public function test_sets_custom_fields_config_for_known_no_branch_postcode()
+    {
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
+
+        // WA14 is in the branch map but deliberately has no branch
+        Functions\when('get_transient')->justReturn('WA14');
+
+        $data = ['addressPostcode' => 'WA14 1AA'];
+        $result = $handler($data);
+        $this->assertNull($result['branch']);
+
+        $branchField = array_filter($result['customFieldsConfig'], function ($f) {
+            return $f['id'] === 'branch';
+        });
+        $this->assertCount(1, $branchField);
+    }
+
     public function test_returns_data_unchanged_when_no_postcode()
     {
         $handler = $this->registerBranchAssignmentAndCaptureHandler();

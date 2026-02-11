@@ -116,6 +116,32 @@ class PostcodeValidationTest extends TestCase
         $this->assertSame('Out of area (submission)', $result['message']);
     }
 
+    public function test_validation_allows_known_postcode_with_no_branch()
+    {
+        $callbacks = $this->registerValidationAndCaptureHandlers();
+        $validator = $callbacks['ck_join_flow_postcode_validation:10'];
+
+        // BL8 is in the branch map but maps to null (no branch)
+        Functions\when('get_transient')->justReturn('BL8');
+
+        $response = ['status' => 'ok'];
+        $result = $validator($response, 'BL8 1AA', [], null);
+        $this->assertSame($response, $result);
+    }
+
+    public function test_step_response_allows_known_postcode_with_no_branch()
+    {
+        $callbacks = $this->registerValidationAndCaptureHandlers();
+        $stepFilter = $callbacks['ck_join_flow_step_response:10'];
+
+        // WA14 is in the branch map but maps to null (no branch)
+        Functions\when('get_transient')->justReturn('WA14');
+
+        $response = ['status' => 'ok'];
+        $result = $stepFilter($response, ['addressPostcode' => 'WA14 1AA']);
+        $this->assertSame($response, $result);
+    }
+
     public function test_step_response_allows_through_when_postcode_empty()
     {
         $callbacks = $this->registerValidationAndCaptureHandlers();
