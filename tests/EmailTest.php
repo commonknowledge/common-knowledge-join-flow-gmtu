@@ -191,22 +191,7 @@ class EmailTest extends TestCase
         $this->assertSame('moss-side@tenantsunion.org.uk', $sentTo);
     }
 
-    public function test_branch_notification_notifies_admin_when_no_branch()
-    {
-        $sentSubject = null;
-        Functions\when('wp_mail')->alias(function ($to, $subject) use (&$sentSubject) {
-            $sentSubject = $subject;
-            return true;
-        });
-
-        send_branch_notification(
-            $this->makeSampleMemberDetails(['branch' => null]),
-            $this->makeSampleNotificationConfig()
-        );
-        $this->assertSame('GMTU Member Registration - No Branch Assigned', $sentSubject);
-    }
-
-    public function test_branch_notification_does_nothing_when_no_branch_and_no_admin()
+    public function test_branch_notification_does_not_send_when_no_branch()
     {
         $mailCalled = false;
         Functions\when('wp_mail')->alias(function () use (&$mailCalled) {
@@ -216,7 +201,7 @@ class EmailTest extends TestCase
 
         send_branch_notification(
             $this->makeSampleMemberDetails(['branch' => null]),
-            $this->makeSampleNotificationConfig(['successNotificationEmails' => []])
+            $this->makeSampleNotificationConfig()
         );
         $this->assertFalse($mailCalled);
     }

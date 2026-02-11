@@ -78,13 +78,9 @@ function send_branch_notification($memberDetails, $config) {
     $branchEmailMap = get_branch_email_map();
     $memberBranch = $memberDetails['branch'];
     
-    // If no branch assigned, notify admin
+    // If no branch assigned, nothing to do — admin already notified at priority 10
     if (empty($memberBranch)) {
-        if (!empty($config['successNotificationEmails'])) {
-            $intro = "A new member has joined but no branch was assigned.\n\nPlease review and assign a branch manually.";
-            $emailBody = build_email_body($intro, $memberDetails);
-            send_notification_emails($config['successNotificationEmails'], 'GMTU Member Registration - No Branch Assigned', $emailBody);
-        }
+        log_info("No branch assigned, skipping branch notification (admin already notified)");
         return;
     }
     
