@@ -62,7 +62,7 @@ require_once __DIR__ . '/src/Notifications.php';
 $config = [
 // Error messages for out-of-area postcodes
     'outOfAreaLookupMessage' => "<p>Sorry, this postcode is outside of Greater Manchester, which the union covers. You won't be able to join the union.</p>",
-    'outOfAreaSubmissionMessage' => '<h3>Sorry</h3><p>We're only able to support tenants living in the Greater Manchester area.</p><p>If you're based elsewhere in the UK, there are other local tenant unions that may be able to help, and for urgent housing issues you can also contact <a href="https://www.shelter.org.uk/Shelter">Shelter</a> or <a href="https://www.crisis.org.uk/">Crisis</a>.</p><p>We're sorry we can't assist directly, but we hope you can get the support you need quickly.</p>',
+    'outOfAreaSubmissionMessage' => '<h3>Sorry</h3><p>We\'re only able to support tenants living in the Greater Manchester area.</p><p>If you\'re based elsewhere in the UK, there are other local tenant unions that may be able to help, and for urgent housing issues you can also contact <a href="https://www.shelter.org.uk/Shelter">Shelter</a> or <a href="https://www.crisis.org.uk/">Crisis</a>.</p><p>We\'re sorry we can\'t assist directly, but we hope you can get the support you need quickly.</p>',
 
 // Success notification settings
     'successNotificationEmails' => ['alex@commonknowledge.coop', 'membership@tenantsunion.org.uk'],
