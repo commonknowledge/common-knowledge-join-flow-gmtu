@@ -2,6 +2,7 @@
     "name": "commonknowledge/join-flow-gmtu",
     "description": "GMTU extensions for the CK Join Flow WordPress plugin",
     "type": "wordpress-plugin",
+    "version": "1.5.0",
     "license": "GPL-2.0-or-later",
     "require": {
         "php": ">=7.4"
