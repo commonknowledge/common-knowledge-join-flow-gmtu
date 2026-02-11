@@ -23,6 +23,9 @@ class BranchTest extends TestCase
         $this->assertArrayHasKey('M14', $map);
         $this->assertArrayHasKey('SK1', $map);
         $this->assertArrayHasKey('OL11', $map);
+        $this->assertArrayHasKey('BL1', $map);
+        $this->assertArrayHasKey('WN1', $map);
+        $this->assertArrayHasKey('WA3', $map);
     }
 
     public function test_get_branch_map_does_not_contain_out_of_area_codes()
@@ -129,6 +132,49 @@ class BranchTest extends TestCase
     public function test_outcode_sk1_resolves_to_stockport()
     {
         $this->assertSame('Stockport', get_branch_for_outcode('SK1'));
+    }
+
+    public function test_outcode_bl1_resolves_to_bolton()
+    {
+        $this->assertSame('Bolton', get_branch_for_outcode('BL1'));
+    }
+
+    public function test_outcode_wn1_resolves_to_wigan()
+    {
+        $this->assertSame('Wigan', get_branch_for_outcode('WN1'));
+    }
+
+    public function test_outcode_wa3_resolves_to_wigan()
+    {
+        $this->assertSame('Wigan', get_branch_for_outcode('WA3'));
+    }
+
+    public function test_outcode_bl8_resolves_to_null_no_branch()
+    {
+        $map = get_branch_map();
+        $this->assertArrayHasKey('BL8', $map);
+        $this->assertNull(get_branch_for_outcode('BL8'));
+    }
+
+    public function test_outcode_wa14_resolves_to_null_no_branch()
+    {
+        $map = get_branch_map();
+        $this->assertArrayHasKey('WA14', $map);
+        $this->assertNull(get_branch_for_outcode('WA14'));
+    }
+
+    public function test_branch_email_map_bolton_has_null_email()
+    {
+        $map = get_branch_email_map();
+        $this->assertArrayHasKey('Bolton', $map);
+        $this->assertNull($map['Bolton']);
+    }
+
+    public function test_branch_email_map_wigan_has_null_email()
+    {
+        $map = get_branch_email_map();
+        $this->assertArrayHasKey('Wigan', $map);
+        $this->assertNull($map['Wigan']);
     }
 
     public function test_outcode_m5_resolves_to_null_unassigned()
