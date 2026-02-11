@@ -7,8 +7,6 @@
 
 namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
 
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\get_branch_email_map;
-
 /**
  * Build email body with member details.
  *
@@ -42,7 +40,10 @@ function build_email_body($introMessage, $memberDetails) {
  */
 function send_notification_emails($recipients, $subject, $body) {
     foreach ($recipients as $recipient) {
-        wp_mail($recipient, $subject, $body);
+        $sent = wp_mail($recipient, $subject, $body);
+        if (!$sent) {
+            log_warning("Failed to send notification email to: $recipient (subject: $subject)");
+        }
     }
 }
 
@@ -103,6 +104,9 @@ function send_branch_notification($memberDetails, $config) {
     // Send notification to branch
     $intro = "A new member has joined your branch!";
     $emailBody = build_email_body($intro, $memberDetails);
-    wp_mail($branchEmail, "New Member Joined {$memberBranch} Branch", $emailBody);
+    $sent = wp_mail($branchEmail, "New Member Joined {$memberBranch} Branch", $emailBody);
+    if (!$sent) {
+        log_warning("Failed to send branch notification to: $branchEmail for branch $memberBranch");
+    }
 }
 

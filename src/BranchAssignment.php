@@ -10,11 +10,6 @@
 
 namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
 
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\get_postcode_outcode;
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\get_branch_map;
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\log_info;
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\log_warning;
-
 /**
  * Register branch assignment hooks.
  *

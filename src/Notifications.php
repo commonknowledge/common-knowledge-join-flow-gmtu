@@ -10,11 +10,6 @@
 
 namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
 
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\get_member_details;
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\send_admin_notification;
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\send_branch_notification;
-use function CommonKnowledge\JoinBlock\Organisation\GMTU\log_info;
-
 /**
  * Register success notification hooks.
  *
