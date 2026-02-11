@@ -16,7 +16,7 @@ class EmailTest extends TestCase
         $this->mockLogger();
     }
 
-    private function memberDetails(array $overrides = []): array
+    private function makeSampleMemberDetails(array $overrides = []): array
     {
         return array_merge([
             'name' => 'Jane Smith',
@@ -27,7 +27,7 @@ class EmailTest extends TestCase
         ], $overrides);
     }
 
-    private function config(array $overrides = []): array
+    private function makeSampleNotificationConfig(array $overrides = []): array
     {
         return array_merge([
             'successNotificationEmails' => ['admin@example.com'],
@@ -40,55 +40,55 @@ class EmailTest extends TestCase
 
     public function test_build_email_body_contains_intro()
     {
-        $body = build_email_body('Welcome!', $this->memberDetails());
+        $body = build_email_body('Welcome!', $this->makeSampleMemberDetails());
         $this->assertStringContainsString('Welcome!', $body);
     }
 
     public function test_build_email_body_contains_name()
     {
-        $body = build_email_body('Hi', $this->memberDetails());
+        $body = build_email_body('Hi', $this->makeSampleMemberDetails());
         $this->assertStringContainsString('Name: Jane Smith', $body);
     }
 
     public function test_build_email_body_contains_email()
     {
-        $body = build_email_body('Hi', $this->memberDetails());
+        $body = build_email_body('Hi', $this->makeSampleMemberDetails());
         $this->assertStringContainsString('Email: jane@example.com', $body);
     }
 
     public function test_build_email_body_contains_postcode()
     {
-        $body = build_email_body('Hi', $this->memberDetails());
+        $body = build_email_body('Hi', $this->makeSampleMemberDetails());
         $this->assertStringContainsString('Postcode: M14 5RQ', $body);
     }
 
     public function test_build_email_body_contains_branch()
     {
-        $body = build_email_body('Hi', $this->memberDetails());
+        $body = build_email_body('Hi', $this->makeSampleMemberDetails());
         $this->assertStringContainsString('Branch: Moss Side', $body);
     }
 
     public function test_build_email_body_shows_no_branch_when_null()
     {
-        $body = build_email_body('Hi', $this->memberDetails(['branch' => null]));
+        $body = build_email_body('Hi', $this->makeSampleMemberDetails(['branch' => null]));
         $this->assertStringContainsString('Branch: No branch found', $body);
     }
 
     public function test_build_email_body_shows_no_branch_when_empty()
     {
-        $body = build_email_body('Hi', $this->memberDetails(['branch' => '']));
+        $body = build_email_body('Hi', $this->makeSampleMemberDetails(['branch' => '']));
         $this->assertStringContainsString('Branch: No branch found', $body);
     }
 
     public function test_build_email_body_contains_payment_level()
     {
-        $body = build_email_body('Hi', $this->memberDetails());
+        $body = build_email_body('Hi', $this->makeSampleMemberDetails());
         $this->assertStringContainsString('Payment Level: £5.00 / month', $body);
     }
 
     public function test_build_email_body_contains_member_details_header()
     {
-        $body = build_email_body('Hi', $this->memberDetails());
+        $body = build_email_body('Hi', $this->makeSampleMemberDetails());
         $this->assertStringContainsString('Member Details:', $body);
     }
 
@@ -158,7 +158,7 @@ class EmailTest extends TestCase
             return true;
         });
 
-        send_admin_notification($this->memberDetails(), $this->config());
+        send_admin_notification($this->makeSampleMemberDetails(), $this->makeSampleNotificationConfig());
         $this->assertSame('admin@example.com', $sentTo);
     }
 
@@ -171,8 +171,8 @@ class EmailTest extends TestCase
         });
 
         send_admin_notification(
-            $this->memberDetails(),
-            $this->config(['successNotificationEmails' => []])
+            $this->makeSampleMemberDetails(),
+            $this->makeSampleNotificationConfig(['successNotificationEmails' => []])
         );
         $this->assertFalse($mailCalled);
     }
@@ -187,7 +187,7 @@ class EmailTest extends TestCase
             return true;
         });
 
-        send_branch_notification($this->memberDetails(), $this->config());
+        send_branch_notification($this->makeSampleMemberDetails(), $this->makeSampleNotificationConfig());
         $this->assertSame('moss-side@tenantsunion.org.uk', $sentTo);
     }
 
@@ -200,8 +200,8 @@ class EmailTest extends TestCase
         });
 
         send_branch_notification(
-            $this->memberDetails(['branch' => null]),
-            $this->config()
+            $this->makeSampleMemberDetails(['branch' => null]),
+            $this->makeSampleNotificationConfig()
         );
         $this->assertSame('GMTU Member Registration - No Branch Assigned', $sentSubject);
     }
@@ -215,8 +215,8 @@ class EmailTest extends TestCase
         });
 
         send_branch_notification(
-            $this->memberDetails(['branch' => null]),
-            $this->config(['successNotificationEmails' => []])
+            $this->makeSampleMemberDetails(['branch' => null]),
+            $this->makeSampleNotificationConfig(['successNotificationEmails' => []])
         );
         $this->assertFalse($mailCalled);
     }
@@ -230,8 +230,8 @@ class EmailTest extends TestCase
         });
 
         send_branch_notification(
-            $this->memberDetails(['branch' => 'Stockport']),
-            $this->config()
+            $this->makeSampleMemberDetails(['branch' => 'Stockport']),
+            $this->makeSampleNotificationConfig()
         );
         $this->assertStringContainsString('No Email for Stockport', $sentSubject);
     }
@@ -248,8 +248,8 @@ class EmailTest extends TestCase
 
         Functions\when('wp_mail')->justReturn(false);
         send_branch_notification(
-            $this->memberDetails(['branch' => 'Hulme']),
-            $this->config()
+            $this->makeSampleMemberDetails(['branch' => 'Hulme']),
+            $this->makeSampleNotificationConfig()
         );
 
         $this->assertTrue($warningLogged);

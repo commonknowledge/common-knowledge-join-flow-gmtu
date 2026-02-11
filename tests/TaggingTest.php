@@ -13,7 +13,7 @@ class TaggingTest extends TestCase
         $this->mockLogger();
     }
 
-    private function captureCallback(): callable
+    private function registerTaggingAndCaptureHandler(): callable
     {
         $callback = null;
         Functions\expect('add_filter')
@@ -44,7 +44,7 @@ class TaggingTest extends TestCase
 
     public function test_appends_branch_to_tags()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerTaggingAndCaptureHandler();
 
         $data = ['branch' => 'Hulme', 'email' => 'j@e.com', 'customFields' => ['branch' => 'Hulme']];
         $result = $handler(['existing-tag'], $data, 'mailchimp');
@@ -53,7 +53,7 @@ class TaggingTest extends TestCase
 
     public function test_does_not_add_tag_when_branch_empty()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerTaggingAndCaptureHandler();
 
         $data = ['email' => 'j@e.com', 'customFields' => []];
         $result = $handler(['existing'], $data, 'mailchimp');
@@ -62,7 +62,7 @@ class TaggingTest extends TestCase
 
     public function test_does_not_add_tag_when_branch_null()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerTaggingAndCaptureHandler();
 
         $data = ['branch' => null, 'email' => 'j@e.com', 'customFields' => ['branch' => null]];
         $result = $handler([], $data, 'zetkin');
@@ -79,7 +79,7 @@ class TaggingTest extends TestCase
             }
         });
 
-        $handler = $this->captureCallback();
+        $handler = $this->registerTaggingAndCaptureHandler();
 
         $data = ['email' => 'test@e.com', 'customFields' => []];
         $handler([], $data, 'mailchimp');
@@ -96,7 +96,7 @@ class TaggingTest extends TestCase
             }
         });
 
-        $handler = $this->captureCallback();
+        $handler = $this->registerTaggingAndCaptureHandler();
 
         $data = ['branch' => 'Hulme', 'email' => 'j@e.com', 'customFields' => ['branch' => 'Hulme']];
         $handler([], $data, 'mailchimp');
@@ -105,7 +105,7 @@ class TaggingTest extends TestCase
 
     public function test_works_with_different_services()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerTaggingAndCaptureHandler();
 
         $data = ['branch' => 'Rochdale', 'email' => 'j@e.com', 'customFields' => ['branch' => 'Rochdale']];
         $result = $handler([], $data, 'zetkin');

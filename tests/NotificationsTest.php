@@ -13,7 +13,7 @@ class NotificationsTest extends TestCase
         $this->mockLogger();
     }
 
-    private function config(): array
+    private function makeSampleNotificationConfig(): array
     {
         return [
             'successNotificationEmails' => ['admin@example.com'],
@@ -22,7 +22,7 @@ class NotificationsTest extends TestCase
         ];
     }
 
-    private function registrationData(): array
+    private function makeSampleJoinSuccessData(): array
     {
         return [
             'firstName' => 'Jane',
@@ -42,7 +42,7 @@ class NotificationsTest extends TestCase
     /**
      * Capture both notification closures keyed by priority.
      */
-    private function captureCallbacks(): array
+    private function registerNotificationsAndCaptureHandlers(): array
     {
         $callbacks = [];
         Functions\expect('add_action')
@@ -52,25 +52,25 @@ class NotificationsTest extends TestCase
                 return true;
             });
 
-        register_notifications($this->config());
+        register_notifications($this->makeSampleNotificationConfig());
         return $callbacks;
     }
 
     public function test_registers_admin_notification_at_priority_10()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerNotificationsAndCaptureHandlers();
         $this->assertArrayHasKey('ck_join_flow_success:10', $callbacks);
     }
 
     public function test_registers_branch_notification_at_priority_20()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerNotificationsAndCaptureHandlers();
         $this->assertArrayHasKey('ck_join_flow_success:20', $callbacks);
     }
 
     public function test_admin_notification_sends_email()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerNotificationsAndCaptureHandlers();
         $adminHandler = $callbacks['ck_join_flow_success:10'];
 
         $sentTo = null;
@@ -79,13 +79,13 @@ class NotificationsTest extends TestCase
             return true;
         });
 
-        $adminHandler($this->registrationData());
+        $adminHandler($this->makeSampleJoinSuccessData());
         $this->assertSame('admin@example.com', $sentTo);
     }
 
     public function test_branch_notification_sends_to_branch_email()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerNotificationsAndCaptureHandlers();
         $branchHandler = $callbacks['ck_join_flow_success:20'];
 
         $sentTo = null;
@@ -94,7 +94,7 @@ class NotificationsTest extends TestCase
             return true;
         });
 
-        $branchHandler($this->registrationData());
+        $branchHandler($this->makeSampleJoinSuccessData());
         $this->assertSame('hulme@tenantsunion.org.uk', $sentTo);
     }
 }

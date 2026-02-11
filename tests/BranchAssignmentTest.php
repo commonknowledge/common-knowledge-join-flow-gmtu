@@ -16,7 +16,7 @@ class BranchAssignmentTest extends TestCase
     /**
      * Register branch assignment and capture the closure.
      */
-    private function captureCallback(): callable
+    private function registerBranchAssignmentAndCaptureHandler(): callable
     {
         $callback = null;
         Functions\expect('add_filter')
@@ -47,7 +47,7 @@ class BranchAssignmentTest extends TestCase
 
     public function test_does_not_overwrite_existing_branch()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
         $data = ['branch' => 'Hulme', 'addressPostcode' => 'M14 5RQ'];
         $result = $handler($data);
@@ -56,7 +56,7 @@ class BranchAssignmentTest extends TestCase
 
     public function test_assigns_branch_from_postcode()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
         Functions\when('get_transient')->justReturn('M14');
 
@@ -67,7 +67,7 @@ class BranchAssignmentTest extends TestCase
 
     public function test_sets_branch_in_custom_fields()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
         Functions\when('get_transient')->justReturn('M14');
 
@@ -78,7 +78,7 @@ class BranchAssignmentTest extends TestCase
 
     public function test_adds_branch_to_custom_fields_config()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
         Functions\when('get_transient')->justReturn('M14');
 
@@ -93,7 +93,7 @@ class BranchAssignmentTest extends TestCase
 
     public function test_does_not_duplicate_branch_in_config()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
         Functions\when('get_transient')->justReturn('M14');
 
@@ -111,7 +111,7 @@ class BranchAssignmentTest extends TestCase
 
     public function test_sets_null_branch_for_null_mapping()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
         Functions\when('get_transient')->justReturn('M5');
 
@@ -122,7 +122,7 @@ class BranchAssignmentTest extends TestCase
 
     public function test_returns_data_unchanged_when_no_postcode()
     {
-        $handler = $this->captureCallback();
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
         $data = ['firstName' => 'Jane'];
         $result = $handler($data);

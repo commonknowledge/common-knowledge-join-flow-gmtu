@@ -89,17 +89,54 @@ class BranchTest extends TestCase
         $this->assertNull($map['Stockport']);
     }
 
-    public function test_get_branch_for_outcode_returns_branch_name()
+    // get_branch_for_outcode — one test per branch
+
+    public function test_outcode_m1_resolves_to_south_manchester()
+    {
+        $this->assertSame('South Manchester', get_branch_for_outcode('M1'));
+    }
+
+    public function test_outcode_m8_resolves_to_harpurhey()
+    {
+        $this->assertSame('Harpurhey', get_branch_for_outcode('M8'));
+    }
+
+    public function test_outcode_m12_resolves_to_leve_longsight()
+    {
+        $this->assertSame('Leve-Longsight', get_branch_for_outcode('M12'));
+    }
+
+    public function test_outcode_m14_resolves_to_moss_side()
     {
         $this->assertSame('Moss Side', get_branch_for_outcode('M14'));
     }
 
-    public function test_get_branch_for_outcode_returns_null_for_unassigned()
+    public function test_outcode_m15_resolves_to_hulme()
+    {
+        $this->assertSame('Hulme', get_branch_for_outcode('M15'));
+    }
+
+    public function test_outcode_m24_resolves_to_middleton()
+    {
+        $this->assertSame('Middleton', get_branch_for_outcode('M24'));
+    }
+
+    public function test_outcode_ol11_resolves_to_rochdale()
+    {
+        $this->assertSame('Rochdale', get_branch_for_outcode('OL11'));
+    }
+
+    public function test_outcode_sk1_resolves_to_stockport()
+    {
+        $this->assertSame('Stockport', get_branch_for_outcode('SK1'));
+    }
+
+    public function test_outcode_m5_resolves_to_null_unassigned()
     {
         $this->assertNull(get_branch_for_outcode('M5'));
     }
 
-    public function test_get_branch_for_outcode_returns_null_for_unknown()
+    public function test_unknown_outcode_resolves_to_null()
     {
         $this->assertNull(get_branch_for_outcode('SW1'));
     }

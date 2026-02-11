@@ -26,7 +26,7 @@ class PostcodeValidationTest extends TestCase
      *
      * @return array Keyed by "hook:priority"
      */
-    private function captureCallbacks(): array
+    private function registerValidationAndCaptureHandlers(): array
     {
         $callbacks = [];
         Functions\expect('add_filter')
@@ -42,19 +42,19 @@ class PostcodeValidationTest extends TestCase
 
     public function test_registers_postcode_validation_filter()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerValidationAndCaptureHandlers();
         $this->assertArrayHasKey('ck_join_flow_postcode_validation:10', $callbacks);
     }
 
     public function test_registers_step_response_filter()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerValidationAndCaptureHandlers();
         $this->assertArrayHasKey('ck_join_flow_step_response:10', $callbacks);
     }
 
     public function test_validation_allows_valid_postcode()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerValidationAndCaptureHandlers();
         $validator = $callbacks['ck_join_flow_postcode_validation:10'];
 
         Functions\when('get_transient')->justReturn('M14');
@@ -66,7 +66,7 @@ class PostcodeValidationTest extends TestCase
 
     public function test_validation_blocks_out_of_area_postcode()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerValidationAndCaptureHandlers();
         $validator = $callbacks['ck_join_flow_postcode_validation:10'];
 
         Functions\when('get_transient')->justReturn('SW1A');
@@ -78,7 +78,7 @@ class PostcodeValidationTest extends TestCase
 
     public function test_validation_allows_through_when_outcode_null()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerValidationAndCaptureHandlers();
         $validator = $callbacks['ck_join_flow_postcode_validation:10'];
 
         // Stub WP functions so get_postcode_outcode returns null (non-200 status)
@@ -94,7 +94,7 @@ class PostcodeValidationTest extends TestCase
 
     public function test_step_response_allows_valid_postcode()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerValidationAndCaptureHandlers();
         $stepFilter = $callbacks['ck_join_flow_step_response:10'];
 
         Functions\when('get_transient')->justReturn('M1');
@@ -106,7 +106,7 @@ class PostcodeValidationTest extends TestCase
 
     public function test_step_response_blocks_out_of_area_postcode()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerValidationAndCaptureHandlers();
         $stepFilter = $callbacks['ck_join_flow_step_response:10'];
 
         Functions\when('get_transient')->justReturn('EC1A');
@@ -118,7 +118,7 @@ class PostcodeValidationTest extends TestCase
 
     public function test_step_response_allows_through_when_postcode_empty()
     {
-        $callbacks = $this->captureCallbacks();
+        $callbacks = $this->registerValidationAndCaptureHandlers();
         $stepFilter = $callbacks['ck_join_flow_step_response:10'];
 
         // get_postcode_outcode returns null for empty string, no WP functions called
