@@ -62,7 +62,7 @@ require_once __DIR__ . '/src/Notifications.php';
 $config = [
 // Error messages for out-of-area postcodes
     'outOfAreaLookupMessage' => '<p>Membership is only available for people living within the Greater Manchester area. You can still support the union by becoming <a href="https://tenantsunion.org.uk/donate/">a regular donor or by making a one-off donation.</a></p>',
-    'outOfAreaSubmissionMessage' => '<h3>Sorry</h3><p>Membership is only available for people living within the Greater Manchester area.</p><p>You can still support the union by becoming <a href="https://tenantsunion.org.uk/donate/">a regular donor or by making a one-off donation</a>.</p><p>If you\'re based elsewhere in the UK, there are other local tenant unions that may be able to help, and for urgent housing issues you can also contact <a href="https://www.shelter.org.uk/Shelter">Shelter</a> or <a href="https://www.crisis.org.uk/">Crisis</a>.</p><p>We\'re sorry we can\'t assist directly, but we hope you can get the support you need quickly.</p>',
+    'outOfAreaSubmissionMessage' => '<h3>Sorry</h3><p>Membership is only available for people living within the Greater Manchester area.</p><p>You can still support the union by becoming <a href="https://tenantsunion.org.uk/donate/">a regular donor or by making a one-off donation</a>.</p><p>If you\'re based elsewhere in the UK, there are other local tenant unions that may be able to help, and for urgent housing issues you can also contact <a href="https://www.shelter.org.uk/Shelter">Shelter</a> or <a href="https://www.crisis.org.uk/">Crisis</a>.</p>',
 
 // Success notification settings
     'successNotificationEmails' => ['alex@commonknowledge.coop', 'membership@tenantsunion.org.uk'],
