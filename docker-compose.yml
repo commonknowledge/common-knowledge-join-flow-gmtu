@@ -29,11 +29,12 @@ services:
   mailpit:
     image: axllent/mailpit
     ports:
-      - "8025:8025"
+      - "8025:8026"
       - "1025:1025"
 
   wpcli:
     image: wordpress:cli
+    user: "33:33"
     depends_on:
       - db
       - wordpress
