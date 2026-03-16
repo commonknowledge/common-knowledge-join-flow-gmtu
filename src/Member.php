@@ -90,11 +90,6 @@ function get_member_details($data) {
         
         log_info("Payment level calculated: $paymentLevel");
     } else {
-        // Fallback: try to show planId or membership
-        $fallbackPlan = $data['planId'] ?? $data['membership'] ?? null;
-        if ($fallbackPlan) {
-            $paymentLevel = 'Plan: ' . $fallbackPlan;
-        }
         log_warning("No membershipPlan found in data, using fallback: $paymentLevel");
     }
     
