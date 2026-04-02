@@ -128,7 +128,7 @@ class LapsingOverrideTest extends TestCase
     {
         // Last payment was last month — 0 missed months → Good
         $lastMonth = $this->monthOffset(-1);
-        Functions\expect('get_option')->andReturn(false); // not lapsed-lapsed
+        Functions\expect('get_option')->andReturn(false); // not lapsed
 
         [$lapse] = $this->registerAndCaptureCallbacks($this->fakeFetcher([$lastMonth]));
 
@@ -165,7 +165,7 @@ class LapsingOverrideTest extends TestCase
         // 8 missed months → Lapsed
         $eightMonthsAgo = $this->monthOffset(-9);
         Functions\expect('get_option')->andReturn(false);
-        Functions\expect('update_option')->once()->andReturn(true); // mark_lapsed_lapsed
+        Functions\expect('update_option')->once()->andReturn(true); // mark_lapsed
 
         [$lapse] = $this->registerAndCaptureCallbacks($this->fakeFetcher([$eightMonthsAgo]));
 
@@ -211,7 +211,7 @@ class LapsingOverrideTest extends TestCase
     public function test_unlapse_allowed_for_good_standing_non_lapsed()
     {
         $lastMonth = $this->monthOffset(-1);
-        Functions\expect('get_option')->andReturn(false); // not lapsed-lapsed
+        Functions\expect('get_option')->andReturn(false); // not lapsed
 
         [, $unlapse] = $this->registerAndCaptureCallbacks($this->fakeFetcher([$lastMonth]));
 
@@ -219,11 +219,11 @@ class LapsingOverrideTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function test_unlapse_suppressed_for_lapsed_lapsed()
+    public function test_unlapse_suppressed_for_lapsed()
     {
         $lastMonth = $this->monthOffset(-1);
         $lapsed = json_encode(['email' => 'member@example.com', 'lapsed_at' => '2026-01-01T00:00:00Z', 'trigger' => 'x']);
-        Functions\expect('get_option')->andReturn($lapsed); // lapsed-lapsed
+        Functions\expect('get_option')->andReturn($lapsed); // lapsed
 
         [, $unlapse] = $this->registerAndCaptureCallbacks($this->fakeFetcher([$lastMonth]));
 
@@ -254,7 +254,7 @@ class LapsingOverrideTest extends TestCase
     // ck_join_flow_success
     // -------------------------------------------------------------------------
 
-    public function test_success_hook_clears_lapsed_lapsed_flag()
+    public function test_success_hook_clears_lapsed_flag()
     {
         [,, $success] = $this->registerAndCaptureCallbacks($this->fakeFetcher([]));
 
@@ -267,7 +267,7 @@ class LapsingOverrideTest extends TestCase
         $this->addToAssertionCount(1); // delete_option ->once() is the assertion
     }
 
-    public function test_success_hook_does_nothing_when_not_lapsed_lapsed()
+    public function test_success_hook_does_nothing_when_not_lapsed()
     {
         [,, $success] = $this->registerAndCaptureCallbacks($this->fakeFetcher([]));
 
