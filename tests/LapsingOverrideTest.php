@@ -128,7 +128,7 @@ class LapsingOverrideTest extends TestCase
     {
         // Last payment was last month — 0 missed months → Good
         $lastMonth = $this->monthOffset(-1);
-        Functions\expect('get_option')->andReturn(false); // not sticky-lapsed
+        Functions\expect('get_option')->andReturn(false); // not lapsed-lapsed
 
         [$lapse] = $this->registerAndCaptureCallbacks($this->fakeFetcher([$lastMonth]));
 
@@ -160,12 +160,12 @@ class LapsingOverrideTest extends TestCase
         $this->assertFalse($result);
     }
 
-    public function test_lapse_allowed_and_sticky_flag_set_for_lapsed()
+    public function test_lapse_allowed_and_lapsed_flag_set_for_lapsed()
     {
         // 8 missed months → Lapsed
         $eightMonthsAgo = $this->monthOffset(-9);
         Functions\expect('get_option')->andReturn(false);
-        Functions\expect('update_option')->once()->andReturn(true); // mark_sticky_lapsed
+        Functions\expect('update_option')->once()->andReturn(true); // mark_lapsed_lapsed
 
         [$lapse] = $this->registerAndCaptureCallbacks($this->fakeFetcher([$eightMonthsAgo]));
 
@@ -208,10 +208,10 @@ class LapsingOverrideTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function test_unlapse_allowed_for_good_standing_non_sticky()
+    public function test_unlapse_allowed_for_good_standing_non_lapsed()
     {
         $lastMonth = $this->monthOffset(-1);
-        Functions\expect('get_option')->andReturn(false); // not sticky-lapsed
+        Functions\expect('get_option')->andReturn(false); // not lapsed-lapsed
 
         [, $unlapse] = $this->registerAndCaptureCallbacks($this->fakeFetcher([$lastMonth]));
 
@@ -219,11 +219,11 @@ class LapsingOverrideTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function test_unlapse_suppressed_for_sticky_lapsed()
+    public function test_unlapse_suppressed_for_lapsed_lapsed()
     {
         $lastMonth = $this->monthOffset(-1);
-        $sticky = json_encode(['email' => 'member@example.com', 'lapsed_at' => '2026-01-01T00:00:00Z', 'trigger' => 'x']);
-        Functions\expect('get_option')->andReturn($sticky); // sticky-lapsed
+        $lapsed = json_encode(['email' => 'member@example.com', 'lapsed_at' => '2026-01-01T00:00:00Z', 'trigger' => 'x']);
+        Functions\expect('get_option')->andReturn($lapsed); // lapsed-lapsed
 
         [, $unlapse] = $this->registerAndCaptureCallbacks($this->fakeFetcher([$lastMonth]));
 
@@ -254,20 +254,20 @@ class LapsingOverrideTest extends TestCase
     // ck_join_flow_success
     // -------------------------------------------------------------------------
 
-    public function test_success_hook_clears_sticky_lapsed_flag()
+    public function test_success_hook_clears_lapsed_lapsed_flag()
     {
         [,, $success] = $this->registerAndCaptureCallbacks($this->fakeFetcher([]));
 
         $email = 'member@example.com';
-        $sticky = json_encode(['email' => $email, 'lapsed_at' => '2026-01-01T00:00:00Z', 'trigger' => 'x']);
-        Functions\expect('get_option')->andReturn($sticky);
+        $lapsed = json_encode(['email' => $email, 'lapsed_at' => '2026-01-01T00:00:00Z', 'trigger' => 'x']);
+        Functions\expect('get_option')->andReturn($lapsed);
         Functions\expect('delete_option')->once()->andReturn(true);
 
         $success(['email' => $email]);
         $this->addToAssertionCount(1); // delete_option ->once() is the assertion
     }
 
-    public function test_success_hook_does_nothing_when_not_sticky_lapsed()
+    public function test_success_hook_does_nothing_when_not_lapsed_lapsed()
     {
         [,, $success] = $this->registerAndCaptureCallbacks($this->fakeFetcher([]));
 
@@ -299,9 +299,8 @@ class LapsingOverrideTest extends TestCase
     {
         return function (string $email) use ($monthKeys): array {
             return [
-                'month_keys'                   => $monthKeys,
-                'first_ever_payment_timestamp' => empty($monthKeys) ? null : 1,
-                'error'                        => null,
+                'month_keys' => $monthKeys,
+                'error'      => null,
             ];
         };
     }
@@ -313,9 +312,8 @@ class LapsingOverrideTest extends TestCase
     {
         return function (string $email) use ($errorMessage): array {
             return [
-                'month_keys'                   => [],
-                'first_ever_payment_timestamp' => null,
-                'error'                        => $errorMessage,
+                'month_keys' => [],
+                'error'      => $errorMessage,
             ];
         };
     }

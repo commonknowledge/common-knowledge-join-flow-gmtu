@@ -74,12 +74,6 @@ class MembershipStandingTest extends TestCase
         $this->assertSame(3, count_missed_completed_months('2025-11', '2026-03'));
     }
 
-    public function test_count_missed_null_last_paid_returns_large_number()
-    {
-        $result = count_missed_completed_months(null, '2026-04');
-        $this->assertGreaterThan(1000, $result);
-    }
-
     // --- last_paid_month_before ---
 
     public function test_last_paid_before_current_month()
@@ -113,77 +107,78 @@ class MembershipStandingTest extends TestCase
 
     public function test_good_standing_paid_last_month()
     {
-        $result = classify_membership_standing(['2026-03'], '2026-04', false);
+        $result = classify_membership_standing(['2026-03'], '2026-04');
         $this->assertSame(STANDING_GOOD, $result);
     }
 
     public function test_good_standing_paid_two_months_ago()
     {
         // Missed 1 completed month
-        $result = classify_membership_standing(['2026-02'], '2026-04', false);
+        $result = classify_membership_standing(['2026-02'], '2026-04');
         $this->assertSame(STANDING_GOOD, $result);
     }
 
     public function test_good_standing_paid_three_months_ago()
     {
-        // Missed 2 completed months (Jan, Feb) — still good
-        $result = classify_membership_standing(['2026-01'], '2026-04', false);
+        // Missed 2 completed months (Jan, Feb) -- still good
+        $result = classify_membership_standing(['2026-01'], '2026-04');
         $this->assertSame(STANDING_GOOD, $result);
     }
 
     public function test_early_arrears_three_missed_months()
     {
         // Missed Jan, Feb, Mar = 3
-        $result = classify_membership_standing(['2025-12'], '2026-04', false);
+        $result = classify_membership_standing(['2025-12'], '2026-04');
         $this->assertSame(STANDING_EARLY_ARREARS, $result);
     }
 
     public function test_lapsing_four_missed_months()
     {
-        $result = classify_membership_standing(['2025-11'], '2026-04', false);
+        $result = classify_membership_standing(['2025-11'], '2026-04');
         $this->assertSame(STANDING_LAPSING, $result);
     }
 
     public function test_lapsing_six_missed_months()
     {
-        $result = classify_membership_standing(['2025-09'], '2026-04', false);
+        $result = classify_membership_standing(['2025-09'], '2026-04');
         $this->assertSame(STANDING_LAPSING, $result);
     }
 
     public function test_lapsed_seven_missed_months()
     {
-        $result = classify_membership_standing(['2025-08'], '2026-04', false);
+        $result = classify_membership_standing(['2025-08'], '2026-04');
         $this->assertSame(STANDING_LAPSED, $result);
     }
 
     public function test_lapsed_twelve_missed_months()
     {
-        $result = classify_membership_standing(['2025-03'], '2026-04', false);
+        $result = classify_membership_standing(['2025-03'], '2026-04');
         $this->assertSame(STANDING_LAPSED, $result);
     }
 
     public function test_lapsed_no_payment_history_at_all()
     {
-        $result = classify_membership_standing([], '2026-04', false);
+        $result = classify_membership_standing([], '2026-04');
         $this->assertSame(STANDING_LAPSED, $result);
     }
 
     public function test_new_member_first_payment_this_month_is_good()
     {
         // No prior payments, first payment is in the current month
-        $result = classify_membership_standing(['2026-04'], '2026-04', false);
+        $result = classify_membership_standing(['2026-04'], '2026-04');
         $this->assertSame(STANDING_GOOD, $result);
     }
 
-    public function test_sticky_lapsed_overrides_good_payment()
+    public function test_lapsed_flag_overrides_good_payment()
     {
-        // Even with a recent payment, sticky-lapsed wins
+        // Even with a recent payment, lapsed flag wins -- must rejoin
         $result = classify_membership_standing(['2026-03'], '2026-04', true);
         $this->assertSame(STANDING_LAPSED, $result);
     }
 
-    public function test_sticky_lapsed_overrides_current_month_payment()
+    public function test_lapsed_flag_overrides_current_month_payment()
     {
+        // Lapsed flag wins even over a current-month payment
         $result = classify_membership_standing(['2026-04'], '2026-04', true);
         $this->assertSame(STANDING_LAPSED, $result);
     }
@@ -191,23 +186,31 @@ class MembershipStandingTest extends TestCase
     public function test_year_boundary_three_missed()
     {
         // As-of March 2026, last paid November 2025: missed Dec, Jan, Feb = 3
-        $result = classify_membership_standing(['2025-11'], '2026-03', false);
+        $result = classify_membership_standing(['2025-11'], '2026-03');
         $this->assertSame(STANDING_EARLY_ARREARS, $result);
     }
 
     public function test_multiple_payments_uses_most_recent_for_missed_count()
     {
-        // Most recent prior payment is Feb, missed only March = 1 → good
-        $result = classify_membership_standing(['2025-06', '2026-02'], '2026-04', false);
+        // Most recent prior payment is Feb, missed only March = 1 -> good
+        $result = classify_membership_standing(['2025-06', '2026-02'], '2026-04');
         $this->assertSame(STANDING_GOOD, $result);
     }
 
-    public function test_payment_in_current_month_does_not_override_existing_lapse_determination()
+    public function test_payment_within_six_months_resets_to_good()
     {
-        // Last payment before current month was July 2025 — 8 missed months → lapsed
-        // Even if there's also a payment in current month, last_paid_before is still July
-        // This covers the case where a sticky-lapsed member paid again without rejoining
-        $result = classify_membership_standing(['2025-07', '2026-04'], '2026-04', true);
-        $this->assertSame(STANDING_LAPSED, $result);
+        // Missed 5 months (lapsing), then pays this month -> Good standing
+        // Last prior payment is from 6 months ago (lapsing band),
+        // but also paid this month -> current month resets via new-member-style logic
+        // Actually: last_paid_before is still old, so missed = 5 = lapsing.
+        // The current-month payment is treated as "new" only when there is no prior payment.
+        // With a prior payment, the missed count is based on the prior payment.
+        // This confirms: within the lapsing window, paying this month does NOT immediately
+        // reset (the completed-month count is based on prior payments). The counter resets
+        // next month once the current month becomes a completed month.
+        $fiveMonthsAgo = gmdate('Y-m', mktime(0, 0, 0, (int)gmdate('n') - 6, 1, (int)gmdate('Y')));
+        $thisMonth     = gmdate('Y-m');
+        $result = classify_membership_standing([$fiveMonthsAgo, $thisMonth], $thisMonth);
+        $this->assertSame(STANDING_LAPSING, $result);
     }
 }

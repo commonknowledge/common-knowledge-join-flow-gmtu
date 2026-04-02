@@ -27,6 +27,6 @@ require_once dirname(__DIR__) . '/src/BranchAssignment.php';
 require_once dirname(__DIR__) . '/src/Tagging.php';
 require_once dirname(__DIR__) . '/src/Notifications.php';
 require_once dirname(__DIR__) . '/src/MembershipStanding.php';
-require_once dirname(__DIR__) . '/src/StickyLapsedStore.php';
+require_once dirname(__DIR__) . '/src/LapsedStore.php';
 require_once dirname(__DIR__) . '/src/StripePaymentHistory.php';
 require_once dirname(__DIR__) . '/src/LapsingOverride.php';

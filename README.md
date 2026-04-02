@@ -48,37 +48,37 @@ Membership standing is classified by counting **completed calendar months** sinc
 
 Additional rules:
 
-- **Only GMTU payments count.** Payments are identified by Stripe charge metadata (`id = "join-gmtu"`) and the Action Network Stripe Connect application ID. Other charges on the same Stripe customer are ignored.
+- **Only GMTU payments count.** Payments are identified by Stripe charge metadata (`id = "join-gmtu"`). Other charges on the same Stripe customer are ignored.
 - **Failed and refunded payments do not count** as paid months.
-- **Sticky lapsed state.** Once a member reaches Lapsed status, a later payment does not automatically reinstate them. They must rejoin via the join form. This state is stored persistently in the WordPress database (see below).
+- **Lapsed is permanent.** Once a member reaches Lapsed status, a later payment does not automatically reinstate them. They must rejoin via the join form. This state is stored persistently in the WordPress database (see below).
 - **New member exception.** If someone makes their very first successful GMTU payment in the current month, they are treated as Good standing immediately.
 
 ### How the override hooks work
 
 **`ck_join_flow_should_lapse_member`**
 
-Called by the parent plugin when Stripe signals that a member should be lapsed. This plugin:
+Called by the parent plugin when a Stripe payment event signals that a member should be lapsed. This plugin:
 
 1. Fetches the member's GMTU payment history from the Stripe Charges API.
 2. Classifies their standing using the rules above.
-3. Returns `true` (allow lapse) only if the member is classified as **Lapsed** (7+ missed months). Sets the sticky-lapsed flag.
-4. Returns `false` (suppress lapse) for Good standing, Early arrears, or Lapsing — Stripe is acting more aggressively than GMTU rules require.
-5. If the member has no GMTU payment history at all, passes through to the parent plugin default (does not interfere with non-GMTU charges).
+3. Returns `true` (allow lapse) only if the member is classified as **Lapsed** (7+ missed months). Records the lapsed flag.
+4. Returns `false` (suppress lapse) for Good standing, Early arrears, or Lapsing -- the parent plugin is acting more aggressively than GMTU rules require.
+5. If the member has no GMTU payment history at all, logs a warning and passes through to the parent plugin default.
 6. Falls through to the parent plugin default on Stripe API errors, to avoid accidental lapsing due to a transient network failure.
 
 **`ck_join_flow_should_unlapse_member`**
 
-Called by the parent plugin when Stripe signals that a member should be unlapsed (e.g. after a successful payment). This plugin:
+Called by the parent plugin when a Stripe payment event signals that a member should be unlapsed (e.g. after a successful payment). This plugin:
 
 1. Fetches the member's GMTU payment history and classifies their standing.
-2. Returns `true` (allow unlapse) only if the member is **Good standing** and does not have the sticky-lapsed flag set.
-3. Returns `false` (suppress unlapse) if the member is sticky-lapsed — they must rejoin explicitly via the join form.
-4. Returns `false` if the member is in Early arrears or Lapsing — one payment is not enough to restore Good standing.
+2. Returns `true` (allow unlapse) only if the member is **Good standing** and is not flagged as lapsed.
+3. Returns `false` (suppress unlapse) if the member is lapsed -- they must rejoin explicitly via the join form.
+4. Returns `false` if the member is in Early arrears or Lapsing -- one payment is not enough to restore Good standing.
 5. Falls through to the parent plugin default on Stripe API errors.
 
 **`ck_join_flow_success` (priority 5)**
 
-When a member completes the join form successfully, the sticky-lapsed flag is cleared. This is what allows a previously-lapsed member to regain Good standing — but only after going through the full join flow again.
+When a member completes the join form successfully, the lapsed flag is cleared. This is what allows a previously-lapsed member to regain Good standing, but only after going through the full join flow again.
 
 ### Example
 
@@ -88,11 +88,11 @@ Suppose today is 15 August. The last completed month is July.
 |---|---|---|---|
 | April | May, Jun, Jul (3) | Early arrears | Suppressed |
 | January | Feb, Mar, Apr, May, Jun, Jul (6) | Lapsing | Suppressed |
-| December (prior year) | Jan–Jul (7) | Lapsed | Allowed; sticky-lapsed flag set |
+| December (prior year) | Jan through Jul (7) | Lapsed | Allowed; lapsed flag recorded |
 
-### Sticky lapsed storage
+### Lapsed flag storage
 
-The sticky-lapsed flag is stored in WordPress `wp_options`, keyed by `gmtu_sticky_lapsed_` followed by the SHA-256 hash of the member's lowercased email address. The stored value is a JSON object recording the email, timestamp, and webhook trigger, for audit purposes. The flag is cleared automatically when the member completes a new join form submission.
+The lapsed flag is stored in WordPress `wp_options`, keyed by `gmtu_lapsed_` followed by the SHA-256 hash of the member's lowercased email address. The stored value is a JSON object recording the email, timestamp, and webhook trigger, for audit purposes. The flag is cleared automatically when the member completes a new join form submission.
 
 ## Structure
 
@@ -109,7 +109,7 @@ src/
   Tagging.php              # Adds branch as tag in external services
   Notifications.php        # Registers success notification hooks
   MembershipStanding.php   # Pure GMTU standing classifier (no I/O, fully unit-tested)
-  StickyLapsedStore.php    # Persists sticky-lapsed state in wp_options
+  LapsedStore.php          # Persists lapsed flag in wp_options
   LapsingOverride.php      # Hooks into parent lapsing filters using the above two
 ```
 

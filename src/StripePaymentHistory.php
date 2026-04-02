@@ -5,7 +5,6 @@
  * Fetches only charges that are identifiable as GMTU membership payments:
  *   - status: succeeded
  *   - metadata.id = 'join-gmtu'
- *   - application = GMTU_APPLICATION_ID (Action Network Stripe Connect app)
  *   - not refunded
  *
  * Returns a list of 'YYYY-MM' month keys (UTC) for months that had at least
@@ -15,12 +14,6 @@
  */
 
 namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
-
-/**
- * Stripe Connect application ID for Action Network (GMTU's integration).
- * Only charges created through this app are counted as GMTU payments.
- */
-const GMTU_APPLICATION_ID = 'ca_A2Dv6C8pMeDm6Q0YSXlmSgtdL5tvArgN';
 
 /**
  * Metadata key that identifies a charge as a GMTU membership payment.
@@ -39,18 +32,14 @@ const GMTU_METADATA_ID = 'join-gmtu';
  * accidentally lapsing a member.
  *
  * @param string $email Member email address.
- * @return array{
- *   month_keys: string[],
- *   first_ever_payment_timestamp: int|null,
- *   error: string|null
- * }
+ * @return array{month_keys: string[], error: string|null}
  */
 function fetch_gmtu_payment_months(string $email): array
 {
     try {
         $stripe_key = \CommonKnowledge\JoinBlock\Settings::get('STRIPE_SECRET_KEY');
         if (empty($stripe_key)) {
-            return ['month_keys' => [], 'first_ever_payment_timestamp' => null, 'error' => 'Stripe secret key not configured'];
+            return ['month_keys' => [], 'error' => 'Stripe secret key not configured'];
         }
 
         \Stripe\Stripe::setApiKey($stripe_key);
@@ -69,7 +58,6 @@ function fetch_gmtu_payment_months(string $email): array
                 $has_more = $charges->has_more;
 
                 foreach ($charges->data as $charge) {
-                    // Skip last item fetched (used as cursor for next page)
                     if ($has_more) {
                         $params['starting_after'] = $charge->id;
                     }
@@ -84,7 +72,7 @@ function fetch_gmtu_payment_months(string $email): array
         }
 
         if (empty($timestamps)) {
-            return ['month_keys' => [], 'first_ever_payment_timestamp' => null, 'error' => null];
+            return ['month_keys' => [], 'error' => null];
         }
 
         sort($timestamps);
@@ -92,15 +80,12 @@ function fetch_gmtu_payment_months(string $email): array
             array_map(fn(int $ts) => gmdate('Y-m', $ts), $timestamps)
         ));
 
-        return [
-            'month_keys'                  => $month_keys,
-            'first_ever_payment_timestamp' => $timestamps[0],
-            'error'                        => null,
-        ];
+        return ['month_keys' => $month_keys, 'error' => null];
+
     } catch (\Stripe\Exception\ApiErrorException $e) {
-        return ['month_keys' => [], 'first_ever_payment_timestamp' => null, 'error' => $e->getMessage()];
+        return ['month_keys' => [], 'error' => $e->getMessage()];
     } catch (\Throwable $e) {
-        return ['month_keys' => [], 'first_ever_payment_timestamp' => null, 'error' => $e->getMessage()];
+        return ['month_keys' => [], 'error' => $e->getMessage()];
     }
 }
 
@@ -110,7 +95,6 @@ function fetch_gmtu_payment_months(string $email): array
  * A charge qualifies if:
  *   - status is 'succeeded'
  *   - metadata.id equals 'join-gmtu'
- *   - application equals the Action Network Stripe Connect app ID
  *   - it has not been refunded
  *
  * @param \Stripe\Charge $charge
@@ -122,9 +106,6 @@ function is_gmtu_charge(\Stripe\Charge $charge): bool
         return false;
     }
     if (($charge->metadata->id ?? null) !== GMTU_METADATA_ID) {
-        return false;
-    }
-    if ($charge->application !== GMTU_APPLICATION_ID) {
         return false;
     }
     if ($charge->refunded || $charge->amount_refunded > 0) {
