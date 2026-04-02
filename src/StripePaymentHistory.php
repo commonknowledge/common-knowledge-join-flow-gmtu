@@ -30,11 +30,28 @@ namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
  * can fall through to the parent plugin's default behaviour rather than
  * accidentally lapsing a member.
  *
- * @param string $email Member email address.
+ * The four optional callable parameters exist for testing. In production
+ * all four default to the real Stripe API and WordPress option calls.
+ *
+ * @param string        $email               Member email address.
+ * @param callable|null $product_ids_getter  fn(): string[]  — returns configured product IDs.
+ * @param callable|null $customer_lister     fn(array $params): object  — wraps Stripe Customer::all.
+ * @param callable|null $subscription_lister fn(array $params): object  — wraps Stripe Subscription::all.
+ * @param callable|null $invoice_lister      fn(array $params): object  — wraps Stripe Invoice::all.
  * @return array{month_keys: string[], error: string|null}
  */
-function fetch_gmtu_payment_months(string $email): array
-{
+function fetch_gmtu_payment_months(
+    string $email,
+    ?callable $product_ids_getter = null,
+    ?callable $customer_lister = null,
+    ?callable $subscription_lister = null,
+    ?callable $invoice_lister = null
+): array {
+    $get_product_ids    = $product_ids_getter  ?? __NAMESPACE__ . '\get_membership_product_ids';
+    $list_customers     = $customer_lister     ?? fn($p) => \Stripe\Customer::all($p);
+    $list_subscriptions = $subscription_lister ?? fn($p) => \Stripe\Subscription::all($p);
+    $list_invoices      = $invoice_lister      ?? fn($p) => \Stripe\Invoice::all($p);
+
     try {
         $stripe_key = \CommonKnowledge\JoinBlock\Settings::get('STRIPE_SECRET_KEY');
         if (empty($stripe_key)) {
@@ -43,13 +60,13 @@ function fetch_gmtu_payment_months(string $email): array
 
         \Stripe\Stripe::setApiKey($stripe_key);
 
-        $product_ids = get_membership_product_ids();
+        $product_ids = $get_product_ids();
         if (empty($product_ids)) {
             return ['month_keys' => [], 'error' => 'No membership plans configured'];
         }
 
         // A single email address may have multiple Stripe customer records.
-        $customers = \Stripe\Customer::all(['email' => $email, 'limit' => 10]);
+        $customers = $list_customers(['email' => $email, 'limit' => 10]);
 
         $timestamps = [];
 
@@ -58,7 +75,7 @@ function fetch_gmtu_payment_months(string $email): array
             $params   = ['customer' => $customer->id, 'status' => 'all', 'limit' => 100];
 
             while ($has_more) {
-                $subscriptions = \Stripe\Subscription::all($params);
+                $subscriptions = $list_subscriptions($params);
                 $has_more      = $subscriptions->has_more;
 
                 foreach ($subscriptions->data as $subscription) {
@@ -72,7 +89,7 @@ function fetch_gmtu_payment_months(string $email): array
 
                     $timestamps = array_merge(
                         $timestamps,
-                        fetch_paid_invoice_timestamps($customer->id, $subscription->id)
+                        fetch_paid_invoice_timestamps($customer->id, $subscription->id, $list_invoices)
                     );
                 }
             }
@@ -160,12 +177,16 @@ function is_gmtu_subscription(\Stripe\Subscription $subscription, array $product
  * specified customer and subscription. Returns the unix timestamp at which
  * each invoice was paid (status_transitions->paid_at).
  *
- * @param string $customer_id     Stripe customer ID.
- * @param string $subscription_id Stripe subscription ID.
+ * @param string   $customer_id     Stripe customer ID.
+ * @param string   $subscription_id Stripe subscription ID.
+ * @param callable $invoice_lister  fn(array $params): object — wraps Invoice::all.
  * @return int[]
  */
-function fetch_paid_invoice_timestamps(string $customer_id, string $subscription_id): array
-{
+function fetch_paid_invoice_timestamps(
+    string $customer_id,
+    string $subscription_id,
+    callable $invoice_lister
+): array {
     $timestamps = [];
     $has_more   = true;
     $params     = [
@@ -176,7 +197,7 @@ function fetch_paid_invoice_timestamps(string $customer_id, string $subscription
     ];
 
     while ($has_more) {
-        $invoices = \Stripe\Invoice::all($params);
+        $invoices = $invoice_lister($params);
         $has_more = $invoices->has_more;
 
         foreach ($invoices->data as $invoice) {

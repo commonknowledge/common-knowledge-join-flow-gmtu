@@ -8,12 +8,19 @@
 // Composer autoloader (loads Brain Monkey, Mockery, PHPUnit polyfills)
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
+// Stub the parent plugin's Settings class so StripePaymentHistory can call
+// Settings::get() without the full WordPress/CarbonFields stack.
+require_once __DIR__ . '/stubs/Settings.php';
+
 // Define WordPress constants the plugin expects
 if (!defined('ABSPATH')) {
     define('ABSPATH', '/tmp/wordpress/');
 }
 if (!defined('DAY_IN_SECONDS')) {
     define('DAY_IN_SECONDS', 86400);
+}
+if (!defined('ARRAY_A')) {
+    define('ARRAY_A', 'ARRAY_A');
 }
 
 // Load all source files in dependency order.
