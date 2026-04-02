@@ -40,11 +40,28 @@ if (! defined('ABSPATH')) exit; // Exit if accessed directly
  *    - Receives: $addTags, $data, $service
  *    - We append the branch name to the tags array.
  *
- * 5. ck_join_flow_success (action, Notifications.php)
+ * 5. ck_join_flow_success (action, LapsingOverride.php, priority 5)
  *    - Fired after successful registration.
  *    - Receives: $data
- *    - Priority 10: sends admin notification email.
- *    - Priority 20: sends branch-specific notification email.
+ *    - Clears the sticky-lapsed flag so a rejoining member regains Good standing.
+ *
+ * 6. ck_join_flow_success (action, Notifications.php, priority 10)
+ *    - Sends admin notification email.
+ *
+ * 7. ck_join_flow_success (action, Notifications.php, priority 20)
+ *    - Sends branch-specific notification email.
+ *
+ * 8. ck_join_flow_should_lapse_member (filter, LapsingOverride.php)
+ *    - Fired when Stripe signals a member should be lapsed.
+ *    - Receives: $should_lapse (bool), $email, $context
+ *    - Returns true only when GMTU standing is Lapsed (7+ missed months).
+ *    - Suppresses lapse for Good / Early Arrears / Lapsing standing.
+ *
+ * 9. ck_join_flow_should_unlapse_member (filter, LapsingOverride.php)
+ *    - Fired when Stripe signals a member should be unlapsed.
+ *    - Receives: $should_unlapse (bool), $email, $context
+ *    - Returns true only when standing is Good and sticky-lapsed flag is not set.
+ *    - Suppresses unlapse for sticky-lapsed members (must rejoin explicitly).
  */
 
 // Load required files
@@ -57,6 +74,10 @@ require_once __DIR__ . '/src/PostcodeValidation.php';
 require_once __DIR__ . '/src/BranchAssignment.php';
 require_once __DIR__ . '/src/Tagging.php';
 require_once __DIR__ . '/src/Notifications.php';
+require_once __DIR__ . '/src/MembershipStanding.php';
+require_once __DIR__ . '/src/StickyLapsedStore.php';
+require_once __DIR__ . '/src/StripePaymentHistory.php';
+require_once __DIR__ . '/src/LapsingOverride.php';
 
 // Configuration
 $config = [
@@ -75,3 +96,4 @@ register_postcode_validation($config);
 register_branch_assignment();
 register_tagging();
 register_notifications($config);
+register_lapsing_override();
