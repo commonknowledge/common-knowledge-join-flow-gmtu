@@ -12,18 +12,12 @@ class LapsedStoreTest extends TestCase
 {
     // --- lapsed_option_key ---
 
-    public function test_option_key_has_correct_prefix()
+    public function test_option_key_format_is_prefix_plus_sha256_of_lowercased_email()
     {
-        $key = lapsed_option_key('test@example.com');
-        $this->assertStringStartsWith('gmtu_lapsed_', $key);
-    }
+        $email    = 'test@example.com';
+        $expected = 'gmtu_lapsed_' . hash('sha256', strtolower(trim($email)));
 
-    public function test_option_key_is_deterministic()
-    {
-        $this->assertSame(
-            lapsed_option_key('test@example.com'),
-            lapsed_option_key('test@example.com')
-        );
+        $this->assertSame($expected, lapsed_option_key($email));
     }
 
     public function test_option_key_is_case_insensitive()
@@ -31,21 +25,6 @@ class LapsedStoreTest extends TestCase
         $this->assertSame(
             lapsed_option_key('Test@Example.COM'),
             lapsed_option_key('test@example.com')
-        );
-    }
-
-    public function test_option_key_suffix_is_sha256_of_lowercased_email()
-    {
-        $email = 'test@example.com';
-        $expected = 'gmtu_lapsed_' . hash('sha256', strtolower(trim($email)));
-        $this->assertSame($expected, lapsed_option_key($email));
-    }
-
-    public function test_different_emails_produce_different_keys()
-    {
-        $this->assertNotSame(
-            lapsed_option_key('alice@example.com'),
-            lapsed_option_key('bob@example.com')
         );
     }
 
@@ -73,23 +52,9 @@ class LapsedStoreTest extends TestCase
 
     // --- mark_lapsed ---
 
-    public function test_mark_lapsed_calls_update_option_with_correct_key()
+    public function test_mark_lapsed_stores_json_with_email_trigger_and_timestamp()
     {
-        $email = 'member@example.com';
-        $key = lapsed_option_key($email);
-
-        Functions\expect('update_option')
-            ->once()
-            ->with($key, \Mockery::type('string'), false)
-            ->andReturn(true);
-
-        mark_lapsed($email, 'invoice_payment_failed', '2026-04-01T00:00:00Z');
-        $this->addToAssertionCount(1);
-    }
-
-    public function test_mark_lapsed_stores_json_with_email()
-    {
-        $email = 'member@example.com';
+        $email  = 'member@example.com';
         $stored = null;
 
         Functions\expect('update_option')
@@ -127,7 +92,7 @@ class LapsedStoreTest extends TestCase
     public function test_clear_lapsed_calls_delete_option_with_correct_key()
     {
         $email = 'member@example.com';
-        $key = lapsed_option_key($email);
+        $key   = lapsed_option_key($email);
 
         Functions\expect('delete_option')
             ->once()

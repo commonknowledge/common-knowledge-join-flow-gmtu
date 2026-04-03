@@ -250,6 +250,34 @@ class StripePaymentHistoryTest extends TestCase
         $this->assertFalse(is_gmtu_subscription($sub, ['prod_gmtu']));
     }
 
+    public function test_is_gmtu_subscription_returns_false_when_product_is_null()
+    {
+        // Stripe may return a price without a product (e.g. archived/detached product).
+        // A null product must never match any configured product ID.
+        $sub = \Stripe\Subscription::constructFrom([
+            'id'     => 'sub_null_product',
+            'object' => 'subscription',
+            'items'  => [
+                'object'   => 'list',
+                'data'     => [
+                    [
+                        'id'     => 'si_1',
+                        'object' => 'subscription_item',
+                        'price'  => [
+                            'id'     => 'price_1',
+                            'object' => 'price',
+                            // 'product' key absent → resolves to null
+                        ],
+                    ],
+                ],
+                'has_more' => false,
+                'url'      => '/v1/subscription_items',
+            ],
+        ]);
+
+        $this->assertFalse(is_gmtu_subscription($sub, ['prod_gmtu']));
+    }
+
     public function test_is_gmtu_subscription_with_expanded_product_object()
     {
         // When the Product is expanded, price->product is a Product object, not a string.
@@ -416,7 +444,6 @@ class StripePaymentHistoryTest extends TestCase
 
         $result = fetch_gmtu_payment_months('member@example.com');
 
-        $this->assertNull($result['month_keys'] ? null : null); // just checking structure
         $this->assertSame([], $result['month_keys']);
         $this->assertNotNull($result['error']);
         $this->assertStringContainsString('Stripe secret key', $result['error']);
