@@ -9,6 +9,90 @@ This add-on to the main [CK Join Flow plugin](https://github.com/commonknowledge
 - **Branch tagging** — Adds the assigned branch name as a tag when members are synced to external services (Mailchimp, Zetkin, etc.).
 - **Email notifications** — Sends admin and branch-specific notification emails when a new member registers.
 - **Postcode lookup caching** — Caches postcodes.io API responses as WordPress transients (7-day TTL) to reduce external API calls.
+- **Membership lapsing override** — Applies GMTU's own standing rules instead of lapsing members immediately on Stripe payment failure.
+
+## Hook lifecycle
+
+The parent plugin fires hooks at each stage of member registration and membership management. This plugin hooks into them in the following order:
+
+| # | Hook | File | What we do |
+|---|------|------|------------|
+| 1 | `ck_join_flow_postcode_validation` (filter) | `PostcodeValidation.php` | Check outcode against branch map; return error if out of area |
+| 2 | `ck_join_flow_step_response` (filter) | `PostcodeValidation.php` | Second-line validation on form step submission |
+| 3 | `ck_join_flow_pre_handle_join` (filter) | `BranchAssignment.php` | Look up postcode outcode, find branch, inject into `$data["branch"]` |
+| 4 | `ck_join_flow_add_tags` (filter) | `Tagging.php` | Append branch name to tags sent to external services |
+| 5 | `ck_join_flow_success` (action, priority 5) | `LapsingOverride.php` | Clear sticky-lapsed flag when a member explicitly rejoins |
+| 6 | `ck_join_flow_success` (action, priority 10) | `Notifications.php` | Send admin notification email |
+| 7 | `ck_join_flow_success` (action, priority 20) | `Notifications.php` | Send branch-specific notification email |
+| 8 | `ck_join_flow_should_lapse_member` (filter) | `LapsingOverride.php` | Override lapse decision using GMTU standing rules (see below) |
+| 9 | `ck_join_flow_should_unlapse_member` (filter) | `LapsingOverride.php` | Override unlapse decision using GMTU standing rules (see below) |
+
+## Membership lapsing override
+
+### Why this exists
+
+Stripe fires webhook events whenever a payment fails or a subscription is cancelled. The parent plugin responds to these by marking the member as lapsed in all configured integrations. For GMTU, this is too aggressive — a single missed payment does not mean a member has lapsed under GMTU's rules.
+
+This plugin intercepts the parent plugin's lapsing decisions and applies GMTU's own standing classification instead.
+
+### Standing classification rules
+
+Membership standing is classified by counting **completed calendar months** since the member's last successful GMTU payment. The current in-progress month is always excluded from this count.
+
+| Missed completed months | Status |
+|------------------------|--------|
+| 0–2 | Good standing |
+| 3 | Early arrears |
+| 4–6 | Lapsing |
+| 7 or more | **Lapsed** |
+
+Additional rules:
+
+- **Only GMTU payments count.** Payments are identified by Stripe charge metadata (`id = "join-gmtu"`). Other charges on the same Stripe customer are ignored.
+- **Failed and refunded payments do not count** as paid months.
+- **Lapsed is permanent.** Once a member reaches Lapsed status, a later payment does not automatically reinstate them. They must rejoin via the join form. This state is stored persistently in the WordPress database (see below).
+- **New member exception.** If someone makes their very first successful GMTU payment in the current month, they are treated as Good standing immediately.
+
+### How the override hooks work
+
+**`ck_join_flow_should_lapse_member`**
+
+Called by the parent plugin when a Stripe payment event signals that a member should be lapsed. This plugin:
+
+1. Fetches the member's GMTU payment history from the Stripe Charges API.
+2. Classifies their standing using the rules above.
+3. Returns `true` (allow lapse) only if the member is classified as **Lapsed** (7+ missed months). Records the lapsed flag.
+4. Returns `false` (suppress lapse) for Good standing, Early arrears, or Lapsing -- the parent plugin is acting more aggressively than GMTU rules require.
+5. If the member has no GMTU payment history at all, logs a warning and passes through to the parent plugin default.
+6. Falls through to the parent plugin default on Stripe API errors, to avoid accidental lapsing due to a transient network failure.
+
+**`ck_join_flow_should_unlapse_member`**
+
+Called by the parent plugin when a Stripe payment event signals that a member should be unlapsed (e.g. after a successful payment). This plugin:
+
+1. Fetches the member's GMTU payment history and classifies their standing.
+2. Returns `true` (allow unlapse) only if the member is **Good standing** and is not flagged as lapsed.
+3. Returns `false` (suppress unlapse) if the member is lapsed -- they must rejoin explicitly via the join form.
+4. Returns `false` if the member is in Early arrears or Lapsing -- one payment is not enough to restore Good standing.
+5. Falls through to the parent plugin default on Stripe API errors.
+
+**`ck_join_flow_success` (priority 5)**
+
+When a member completes the join form successfully, the lapsed flag is cleared. This is what allows a previously-lapsed member to regain Good standing, but only after going through the full join flow again.
+
+### Example
+
+Suppose today is 15 August. The last completed month is July.
+
+| Last payment | Missed months | Status | Lapse webhook outcome |
+|---|---|---|---|
+| April | May, Jun, Jul (3) | Early arrears | Suppressed |
+| January | Feb, Mar, Apr, May, Jun, Jul (6) | Lapsing | Suppressed |
+| December (prior year) | Jan through Jul (7) | Lapsed | Allowed; lapsed flag recorded |
+
+### Lapsed flag storage
+
+The lapsed flag is stored in WordPress `wp_options`, keyed by `gmtu_lapsed_` followed by the SHA-256 hash of the member's lowercased email address. The stored value is a JSON object recording the email, timestamp, and webhook trigger, for audit purposes. The flag is cleared automatically when the member completes a new join form submission.
 
 ## Structure
 
@@ -24,6 +108,9 @@ src/
   BranchAssignment.php     # Assigns branch to member data based on postcode
   Tagging.php              # Adds branch as tag in external services
   Notifications.php        # Registers success notification hooks
+  MembershipStanding.php   # Pure GMTU standing classifier (no I/O, fully unit-tested)
+  LapsedStore.php          # Persists lapsed flag in wp_options
+  LapsingOverride.php      # Hooks into parent lapsing filters using the above two
 ```
 
 ## Configuration
