@@ -20,9 +20,7 @@ function get_member_details($data) {
     
     log_info("=== get_member_details FUNCTION START ===");
     log_info("Data keys: " . implode(", ", array_keys($data)));
-    log_info("Checking branch in multiple locations:");
-    log_info("  - data['branch']: " . ($data['branch'] ?? "NOT SET"));
-    log_info("  - data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+    log_info("data['branch']: " . ($data['branch'] ?? "NOT SET"));
     log_info("Checking membershipPlan:");
     log_info("  - data['membershipPlan'] exists: " . (isset($data['membershipPlan']) ? "YES" : "NO"));
     if (isset($data['membershipPlan'])) {

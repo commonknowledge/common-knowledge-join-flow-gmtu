@@ -24,7 +24,6 @@ function register_notifications($config) {
         log_info("=== ck_join_flow_success ACTION (priority 10) START ===");
         log_info("Data keys: " . implode(", ", array_keys($data)));
         log_info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
-        log_info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
         log_info("MembershipPlan in data: " . (isset($data['membershipPlan']) ? json_encode($data['membershipPlan']) : "NOT SET"));
         log_info("Full data received: " . json_encode($data));
         
@@ -37,7 +36,6 @@ function register_notifications($config) {
         log_info("=== ck_join_flow_success ACTION (priority 20) START ===");
         log_info("Data keys: " . implode(", ", array_keys($data)));
         log_info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
-        log_info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
         log_info("MembershipPlan in data: " . (isset($data['membershipPlan']) ? json_encode($data['membershipPlan']) : "NOT SET"));
         log_info("Full data received: " . json_encode($data));
         
