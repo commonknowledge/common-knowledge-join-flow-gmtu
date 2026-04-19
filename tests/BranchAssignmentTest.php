@@ -97,6 +97,22 @@ class BranchAssignmentTest extends TestCase
         $this->assertSame($data, $result);
     }
 
+    /*
+     * Regression tests for the Zetkin "invalid parameter" bug (fixed in PR #9).
+     *
+     * Prior versions of this filter injected `branch` into both
+     * `customFieldsConfig` and `customFields`. The core join-block plugin
+     * forwards `customFields` as direct fields on Zetkin's People API call —
+     * Zetkin rejects `branch` as an unrecognised person field and the entire
+     * signup request fails. Because the Zetkin call failed, the downstream
+     * `ck_join_flow_add_tags` filter (which correctly adds branch as a tag)
+     * never ran, so new members ended up with no branch assigned at all.
+     *
+     * The two tests below pin the fix: branch information must flow to Zetkin
+     * only via the tag filter, never as a custom person field. If someone
+     * reintroduces a `customFields['branch']` or `customFieldsConfig` entry
+     * for branch, these tests will fail loudly.
+     */
     public function test_does_not_add_branch_to_custom_fields_config()
     {
         $handler = $this->registerBranchAssignmentAndCaptureHandler();
