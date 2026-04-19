@@ -49,7 +49,7 @@ Membership standing is classified by counting **completed calendar months** sinc
 Additional rules:
 
 - **Only GMTU payments count.** Payments are identified by the Stripe **product ID** on a subscription's line items: only subscriptions whose product ID matches a configured GMTU membership plan are counted. Configured product IDs are discovered by reading every `wp_options` row with the `ck_join_flow_membership_plan_` prefix (written by the parent plugin when plans are saved) and collecting each plan's `stripe_product_id`. Unrelated subscriptions on the same Stripe customer are ignored.
-- **Failed and refunded payments do not count** as paid months.
+- **Only paid invoices count.** The fetcher asks Stripe for invoices with `status=paid` and records each invoice's `status_transitions.paid_at` timestamp. Draft, open, void, and uncollectible invoices are skipped. (A later refund does not reset an invoice's `paid` status, so a refunded payment's month will still count — out-of-band refunds are rare enough for GMTU that this is acceptable.)
 - **Lapsed is permanent.** Once a member reaches Lapsed status, a later payment does not automatically reinstate them. They must rejoin via the join form. This state is stored persistently in the WordPress database (see below).
 - **New member exception.** If someone makes their very first successful GMTU payment in the current month, they are treated as Good standing immediately.
 
