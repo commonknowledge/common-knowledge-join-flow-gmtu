@@ -19,7 +19,7 @@ The parent plugin fires hooks at each stage of member registration and membershi
 |---|------|------|------------|
 | 1 | `ck_join_flow_postcode_validation` (filter) | `PostcodeValidation.php` | Check outcode against branch map; return error if out of area |
 | 2 | `ck_join_flow_step_response` (filter) | `PostcodeValidation.php` | Second-line validation on form step submission |
-| 3 | `ck_join_flow_pre_handle_join` (filter) | `BranchAssignment.php` | Look up postcode outcode, find branch, inject into `$data["branch"]` |
+| 3 | `ck_join_flow_pre_handle_join` (filter) | `BranchAssignment.php` | Look up postcode outcode, find branch, inject into `$data["branch"]`, `$data["customFields"]["branch"]`, and `$data["customFieldsConfig"]` |
 | 4 | `ck_join_flow_add_tags` (filter) | `Tagging.php` | Append branch name to tags sent to external services |
 | 5 | `ck_join_flow_success` (action, priority 5) | `LapsingOverride.php` | Clear sticky-lapsed flag when a member explicitly rejoins |
 | 6 | `ck_join_flow_success` (action, priority 10) | `Notifications.php` | Send admin notification email |
@@ -48,18 +48,20 @@ Membership standing is classified by counting **completed calendar months** sinc
 
 Additional rules:
 
-- **Only GMTU payments count.** Payments are identified by Stripe charge metadata (`id = "join-gmtu"`). Other charges on the same Stripe customer are ignored.
-- **Failed and refunded payments do not count** as paid months.
+- **Only GMTU payments count.** Payments are identified by the Stripe **product ID** on a subscription's line items: only subscriptions whose product ID matches a configured GMTU membership plan are counted. Configured product IDs are discovered by reading every `wp_options` row with the `ck_join_flow_membership_plan_` prefix (written by the parent plugin when plans are saved) and collecting each plan's `stripe_product_id`. Unrelated subscriptions on the same Stripe customer are ignored.
+- **Only paid invoices count.** The fetcher asks Stripe for invoices with `status=paid` and records each invoice's `status_transitions.paid_at` timestamp. Draft, open, void, and uncollectible invoices are skipped. (A later refund does not reset an invoice's `paid` status, so a refunded payment's month will still count — out-of-band refunds are rare enough for GMTU that this is acceptable.)
 - **Lapsed is permanent.** Once a member reaches Lapsed status, a later payment does not automatically reinstate them. They must rejoin via the join form. This state is stored persistently in the WordPress database (see below).
 - **New member exception.** If someone makes their very first successful GMTU payment in the current month, they are treated as Good standing immediately.
 
 ### How the override hooks work
 
+Both override filters inspect the `provider` value on the context array passed by the parent plugin and only run their custom logic when `provider === 'stripe'`. Any non-Stripe provider returns the incoming decision unchanged, leaving the parent plugin's default behaviour in place.
+
 **`ck_join_flow_should_lapse_member`**
 
 Called by the parent plugin when a Stripe payment event signals that a member should be lapsed. This plugin:
 
-1. Fetches the member's GMTU payment history from the Stripe Charges API.
+1. Fetches the member's GMTU payment history by querying the Stripe Customers, Subscriptions, and Invoices APIs: find all Stripe customers for the email, list their subscriptions, filter to GMTU membership subscriptions (see above), and collect the `paid_at` timestamps of each subscription's paid invoices.
 2. Classifies their standing using the rules above.
 3. Returns `true` (allow lapse) only if the member is classified as **Lapsed** (7+ missed months). Records the lapsed flag.
 4. Returns `false` (suppress lapse) for Good standing, Early arrears, or Lapsing -- the parent plugin is acting more aggressively than GMTU rules require.
@@ -110,7 +112,8 @@ src/
   Notifications.php        # Registers success notification hooks
   MembershipStanding.php   # Pure GMTU standing classifier (no I/O, fully unit-tested)
   LapsedStore.php          # Persists lapsed flag in wp_options
-  LapsingOverride.php      # Hooks into parent lapsing filters using the above two
+  StripePaymentHistory.php # Fetches paid-invoice months from Stripe (Customers + Subscriptions + Invoices)
+  LapsingOverride.php      # Hooks into parent lapsing filters using the above three
 ```
 
 ## Configuration
