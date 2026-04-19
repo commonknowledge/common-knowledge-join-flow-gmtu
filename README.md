@@ -59,7 +59,7 @@ Additional rules:
 
 Called by the parent plugin when a Stripe payment event signals that a member should be lapsed. This plugin:
 
-1. Fetches the member's GMTU payment history from the Stripe Charges API.
+1. Fetches the member's GMTU payment history by querying the Stripe Customers, Subscriptions, and Invoices APIs: find all Stripe customers for the email, list their subscriptions, filter to GMTU membership subscriptions (see above), and collect the `paid_at` timestamps of each subscription's paid invoices.
 2. Classifies their standing using the rules above.
 3. Returns `true` (allow lapse) only if the member is classified as **Lapsed** (7+ missed months). Records the lapsed flag.
 4. Returns `false` (suppress lapse) for Good standing, Early arrears, or Lapsing -- the parent plugin is acting more aggressively than GMTU rules require.
