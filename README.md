@@ -110,7 +110,8 @@ src/
   Notifications.php        # Registers success notification hooks
   MembershipStanding.php   # Pure GMTU standing classifier (no I/O, fully unit-tested)
   LapsedStore.php          # Persists lapsed flag in wp_options
-  LapsingOverride.php      # Hooks into parent lapsing filters using the above two
+  StripePaymentHistory.php # Fetches paid-invoice months from Stripe (Customers + Subscriptions + Invoices)
+  LapsingOverride.php      # Hooks into parent lapsing filters using the above three
 ```
 
 ## Configuration
