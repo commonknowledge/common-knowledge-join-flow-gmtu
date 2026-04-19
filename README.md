@@ -55,6 +55,8 @@ Additional rules:
 
 ### How the override hooks work
 
+Both override filters inspect the `provider` value on the context array passed by the parent plugin and only run their custom logic when `provider === 'stripe'`. Any non-Stripe provider returns the incoming decision unchanged, leaving the parent plugin's default behaviour in place.
+
 **`ck_join_flow_should_lapse_member`**
 
 Called by the parent plugin when a Stripe payment event signals that a member should be lapsed. This plugin:
