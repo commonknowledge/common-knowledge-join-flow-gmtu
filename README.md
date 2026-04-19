@@ -19,7 +19,7 @@ The parent plugin fires hooks at each stage of member registration and membershi
 |---|------|------|------------|
 | 1 | `ck_join_flow_postcode_validation` (filter) | `PostcodeValidation.php` | Check outcode against branch map; return error if out of area |
 | 2 | `ck_join_flow_step_response` (filter) | `PostcodeValidation.php` | Second-line validation on form step submission |
-| 3 | `ck_join_flow_pre_handle_join` (filter) | `BranchAssignment.php` | Look up postcode outcode, find branch, inject into `$data["branch"]` |
+| 3 | `ck_join_flow_pre_handle_join` (filter) | `BranchAssignment.php` | Look up postcode outcode, find branch, inject into `$data["branch"]`, `$data["customFields"]["branch"]`, and `$data["customFieldsConfig"]` |
 | 4 | `ck_join_flow_add_tags` (filter) | `Tagging.php` | Append branch name to tags sent to external services |
 | 5 | `ck_join_flow_success` (action, priority 5) | `LapsingOverride.php` | Clear sticky-lapsed flag when a member explicitly rejoins |
 | 6 | `ck_join_flow_success` (action, priority 10) | `Notifications.php` | Send admin notification email |
