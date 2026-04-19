@@ -78,14 +78,6 @@ class MemberTest extends TestCase
         $this->assertSame('Moss Side', $result['branch']);
     }
 
-    public function test_uses_branch_from_custom_fields_fallback()
-    {
-        $data = $this->makeSampleRegistrationData();
-        unset($data['branch']);
-        $result = get_member_details($data);
-        $this->assertSame('Moss Side', $result['branch']);
-    }
-
     public function test_recalculates_branch_from_postcode_when_missing()
     {
         $data = $this->makeSampleRegistrationData([

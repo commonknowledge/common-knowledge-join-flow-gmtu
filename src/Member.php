@@ -31,9 +31,8 @@ function get_member_details($data) {
     log_info("Available plan data: planId=" . ($data['planId'] ?? "NOT SET") . ", membership=" . ($data['membership'] ?? "NOT SET"));
     log_info("Full data structure: " . json_encode($data));
     
-    // Try to get branch from multiple possible locations
-    $branch = $data['branch'] ?? $data['customFields']['branch'] ?? null;
-    
+    $branch = $data['branch'] ?? null;
+
     // If branch not found, recalculate from postcode
     if (empty($branch) && !empty($data['addressPostcode'])) {
         log_info("Branch not found in data, recalculating from postcode: " . $data['addressPostcode']);
