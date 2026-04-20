@@ -65,50 +65,6 @@ class BranchAssignmentTest extends TestCase
         $this->assertSame('Moss Side', $result['branch']);
     }
 
-    public function test_sets_branch_in_custom_fields()
-    {
-        $handler = $this->registerBranchAssignmentAndCaptureHandler();
-
-        Functions\when('get_transient')->justReturn('M14');
-
-        $data = ['addressPostcode' => 'M14 5RQ'];
-        $result = $handler($data);
-        $this->assertSame('Moss Side', $result['customFields']['branch']);
-    }
-
-    public function test_adds_branch_to_custom_fields_config()
-    {
-        $handler = $this->registerBranchAssignmentAndCaptureHandler();
-
-        Functions\when('get_transient')->justReturn('M14');
-
-        $data = ['addressPostcode' => 'M14 5RQ'];
-        $result = $handler($data);
-
-        $branchField = array_filter($result['customFieldsConfig'], function ($f) {
-            return $f['id'] === 'branch';
-        });
-        $this->assertCount(1, $branchField);
-    }
-
-    public function test_does_not_duplicate_branch_in_config()
-    {
-        $handler = $this->registerBranchAssignmentAndCaptureHandler();
-
-        Functions\when('get_transient')->justReturn('M14');
-
-        $data = [
-            'addressPostcode' => 'M14 5RQ',
-            'customFieldsConfig' => [['id' => 'branch', 'field_type' => 'text']],
-        ];
-        $result = $handler($data);
-
-        $branchFields = array_filter($result['customFieldsConfig'], function ($f) {
-            return $f['id'] === 'branch';
-        });
-        $this->assertCount(1, $branchFields);
-    }
-
     public function test_sets_null_branch_for_null_mapping()
     {
         $handler = $this->registerBranchAssignmentAndCaptureHandler();
@@ -130,24 +86,6 @@ class BranchAssignmentTest extends TestCase
         $data = ['addressPostcode' => 'BL8 1AA'];
         $result = $handler($data);
         $this->assertNull($result['branch']);
-        $this->assertNull($result['customFields']['branch']);
-    }
-
-    public function test_sets_custom_fields_config_for_known_no_branch_postcode()
-    {
-        $handler = $this->registerBranchAssignmentAndCaptureHandler();
-
-        // WA14 is in the branch map but deliberately has no branch
-        Functions\when('get_transient')->justReturn('WA14');
-
-        $data = ['addressPostcode' => 'WA14 1AA'];
-        $result = $handler($data);
-        $this->assertNull($result['branch']);
-
-        $branchField = array_filter($result['customFieldsConfig'], function ($f) {
-            return $f['id'] === 'branch';
-        });
-        $this->assertCount(1, $branchField);
     }
 
     public function test_returns_data_unchanged_when_no_postcode()
@@ -157,5 +95,48 @@ class BranchAssignmentTest extends TestCase
         $data = ['firstName' => 'Jane'];
         $result = $handler($data);
         $this->assertSame($data, $result);
+    }
+
+    /*
+     * Regression tests for the Zetkin "invalid parameter" bug (fixed in PR #9).
+     *
+     * Prior versions of this filter injected `branch` into both
+     * `customFieldsConfig` and `customFields`. The core join-block plugin
+     * forwards `customFields` as direct fields on Zetkin's People API call —
+     * Zetkin rejects `branch` as an unrecognised person field and the entire
+     * signup request fails. Because the Zetkin call failed, the downstream
+     * `ck_join_flow_add_tags` filter (which correctly adds branch as a tag)
+     * never ran, so new members ended up with no branch assigned at all.
+     *
+     * The two tests below pin the fix: branch information must flow to Zetkin
+     * only via the tag filter, never as a custom person field. If someone
+     * reintroduces a `customFields['branch']` or `customFieldsConfig` entry
+     * for branch, these tests will fail loudly.
+     */
+    public function test_does_not_add_branch_to_custom_fields_config()
+    {
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
+
+        Functions\when('get_transient')->justReturn('M14');
+
+        $data = ['addressPostcode' => 'M14 5RQ'];
+        $result = $handler($data);
+
+        $branchField = array_filter($result['customFieldsConfig'] ?? [], function ($f) {
+            return $f['id'] === 'branch';
+        });
+        $this->assertCount(0, $branchField, 'branch must not be sent as a custom field — Zetkin rejects it as an invalid person field');
+    }
+
+    public function test_does_not_set_branch_in_custom_fields()
+    {
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
+
+        Functions\when('get_transient')->justReturn('M14');
+
+        $data = ['addressPostcode' => 'M14 5RQ'];
+        $result = $handler($data);
+
+        $this->assertArrayNotHasKey('branch', $result['customFields'] ?? [], 'branch must not be sent as a custom field — Zetkin rejects it as an invalid person field');
     }
 }

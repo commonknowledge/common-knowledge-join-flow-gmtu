@@ -27,6 +27,26 @@ The parent plugin fires hooks at each stage of member registration and membershi
 | 8 | `ck_join_flow_should_lapse_member` (filter) | `LapsingOverride.php` | Override lapse decision using GMTU standing rules (see below) |
 | 9 | `ck_join_flow_should_unlapse_member` (filter) | `LapsingOverride.php` | Override unlapse decision using GMTU standing rules (see below) |
 
+## Branch tagging
+
+### Why this exists
+
+Branch organisers use the CRM tools (Mailchimp, Action Network, Zetkin) to segment and contact their members. For that to work, every new signup must arrive in the CRM already tagged with the branch that was assigned from their postcode.
+
+### How it works
+
+The parent plugin fires the `ck_join_flow_add_tags` filter once per integration service during a successful signup, passing the current tag array, the member data, and the service name. This plugin hooks that filter in `Tagging.php` and appends `$data["branch"]` — which was populated earlier by the `ck_join_flow_pre_handle_join` filter in `BranchAssignment.php` — onto the tag array. The parent plugin then sends the combined tags to each service through its normal tagging path.
+
+Because the filter fires per service, every configured integration receives the same branch tag. Nothing in this plugin talks to the CRMs directly; the parent plugin owns transport.
+
+### Zetkin: tagging only, never a custom field
+
+In Zetkin specifically, branch information **must** flow via tags and **never** as a custom person field. The core join-block plugin forwards `customFields` as direct fields on Zetkin's People API, and Zetkin rejects `branch` as an unrecognised field — the entire signup request fails with an "invalid parameter" error. An earlier version of this plugin injected `branch` into `customFields` and `customFieldsConfig`; that caused every Zetkin signup to fail before the tag filter ever ran, so members ended up with no branch recorded. See PR #9 for the fix. The regression tests in `tests/BranchAssignmentTest.php` pin this: branch must never appear in either `customFields` or `customFieldsConfig`.
+
+### No-branch case
+
+If `$data["branch"]` is empty — either because the postcode outcode is deliberately mapped to `null` in `Branch.php` (e.g. Stockport-area postcodes that currently have no branch), or because branch assignment failed upstream — the filter logs a warning naming the service and the member email, and returns the tag array untouched. The signup still completes; it just arrives in the CRM without a branch tag.
+
 ## Membership lapsing override
 
 ### Why this exists

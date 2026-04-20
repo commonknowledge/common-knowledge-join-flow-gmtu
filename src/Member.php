@@ -20,9 +20,7 @@ function get_member_details($data) {
     
     log_info("=== get_member_details FUNCTION START ===");
     log_info("Data keys: " . implode(", ", array_keys($data)));
-    log_info("Checking branch in multiple locations:");
-    log_info("  - data['branch']: " . ($data['branch'] ?? "NOT SET"));
-    log_info("  - data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
+    log_info("data['branch']: " . ($data['branch'] ?? "NOT SET"));
     log_info("Checking membershipPlan:");
     log_info("  - data['membershipPlan'] exists: " . (isset($data['membershipPlan']) ? "YES" : "NO"));
     if (isset($data['membershipPlan'])) {
@@ -31,9 +29,8 @@ function get_member_details($data) {
     log_info("Available plan data: planId=" . ($data['planId'] ?? "NOT SET") . ", membership=" . ($data['membership'] ?? "NOT SET"));
     log_info("Full data structure: " . json_encode($data));
     
-    // Try to get branch from multiple possible locations
-    $branch = $data['branch'] ?? $data['customFields']['branch'] ?? null;
-    
+    $branch = $data['branch'] ?? null;
+
     // If branch not found, recalculate from postcode
     if (empty($branch) && !empty($data['addressPostcode'])) {
         log_info("Branch not found in data, recalculating from postcode: " . $data['addressPostcode']);

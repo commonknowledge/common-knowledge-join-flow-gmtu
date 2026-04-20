@@ -2,8 +2,7 @@
 /**
  * Branch assignment functionality.
  *
- * Automatically assigns branches to members based on their postcode
- * and ensures branch data is properly stored in custom fields.
+ * Automatically assigns branches to members based on their postcode.
  *
  * @package CommonKnowledge\JoinBlock\Organisation\GMTU
  */
@@ -51,34 +50,9 @@ function register_branch_assignment() {
             log_warning("Outcode $outcode not found in branch map for postcode $postcode");
         }
         
-        // Ensure "branch" custom field exists in config
-        $customFields = $data["customFieldsConfig"] ?? [];
-        $customFieldExists = false;
-        foreach ($customFields as $field) {
-            if ($field["id"] === "branch") {
-                $customFieldExists = true;
-                break;
-            }
-        }
-        if (!$customFieldExists) {
-            $customFields[] = [
-                "id" => "branch",
-                "field_type" => "text"
-            ];
-        }
-        $data["customFieldsConfig"] = $customFields;
-        
-        // Also set the branch value in the custom fields data
-        if (!isset($data["customFields"])) {
-            $data["customFields"] = [];
-        }
-        $data["customFields"]["branch"] = $branch;
-
         log_info("=== ck_join_flow_pre_handle_join FILTER END ===");
         log_info("Branch set to: " . ($branch ?? "NULL"));
         log_info("data['branch']: " . ($data["branch"] ?? "NOT SET"));
-        log_info("data['customFields']['branch']: " . ($data["customFields"]["branch"] ?? "NOT SET"));
-        log_info("MembershipPlan still present: " . (isset($data["membershipPlan"]) ? "YES - " . json_encode($data["membershipPlan"]) : "NO"));
         log_info("Full outgoing data: " . json_encode($data));
         
         return $data;

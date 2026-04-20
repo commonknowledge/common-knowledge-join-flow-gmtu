@@ -23,7 +23,6 @@ function register_tagging() {
         log_info("=== ck_join_flow_add_tags FILTER for $service ===");
         log_info("Data keys: " . implode(", ", array_keys($data)));
         log_info("Branch in data['branch']: " . ($data['branch'] ?? "NOT SET"));
-        log_info("Branch in data['customFields']['branch']: " . ($data['customFields']['branch'] ?? "NOT SET"));
         log_info("Full data structure: " . json_encode($data));
         
         $branch = $data['branch'] ?? null;
