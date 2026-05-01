@@ -1,4 +1,4 @@
-# CK Join Flow Extensions for GMTU
+# Join Flow Extensions for GMTU
 
 This add-on to the main [CK Join Flow plugin](https://github.com/commonknowledge/join) includes functionality specific to the Greater Manchester Tenants Union (GMTU) installation.
 
