@@ -31,7 +31,7 @@ The parent plugin fires hooks at each stage of member registration and membershi
 
 Changing the branch map only affects people who join after the change. Nothing in the join flow revisits an existing member, so after a branch is renamed, split or added, everyone who joined before it keeps the tag they were given at the time.
 
-`wp gmtu retag_branches` recalculates each member's branch from their postcode in Zetkin and fixes the difference. It previews by default and writes nothing without `--apply`:
+`wp gmtu retag_branches` recalculates each member's branch from their postcode in Zetkin and fixes the difference. It needs Common Knowledge Join Flow **1.4.38 or newer** for the bulk Zetkin helpers, and refuses to start against anything older rather than failing part way through a run. It previews by default and writes nothing without `--apply`:
 
 ```bash
 wp gmtu retag_branches                    # report only, writes nothing
