@@ -16,6 +16,8 @@
 
 namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
 
+use CommonKnowledge\JoinBlock\Services\ZetkinService;
+
 /**
  * Work out what should happen to each member's branch tags.
  *
@@ -144,13 +146,11 @@ function run_branch_retag(
     ?callable $tag_adder = null,
     ?callable $tag_remover = null
 ): array {
-    $zetkin = '\CommonKnowledge\JoinBlock\Services\ZetkinService';
-
-    $list_people  = $people_lister ?? fn($page, $perPage) => $zetkin::listPeople($page, $perPage);
-    $get_tags     = $tags_getter   ?? fn($personId) => $zetkin::getPersonTags($personId);
-    $resolve_tag  = $tag_resolver  ?? fn($title) => $zetkin::findOrCreateTagByTitle($title);
-    $add_tag      = $tag_adder     ?? fn($personId, $tagId) => $zetkin::addTagToPerson($personId, $tagId);
-    $remove_tag   = $tag_remover   ?? fn($personId, $tagId) => $zetkin::removeTagFromPerson($personId, $tagId);
+    $list_people = $people_lister ?? fn($page, $perPage) => ZetkinService::listPeople($page, $perPage);
+    $get_tags    = $tags_getter   ?? fn($personId) => ZetkinService::getPersonTags($personId);
+    $resolve_tag = $tag_resolver  ?? fn($title) => ZetkinService::findOrCreateTagByTitle($title);
+    $add_tag     = $tag_adder     ?? fn($personId, $tagId) => ZetkinService::addTagToPerson($personId, $tagId);
+    $remove_tag  = $tag_remover   ?? fn($personId, $tagId) => ZetkinService::removeTagFromPerson($personId, $tagId);
 
     $perPage = 100;
     $people = [];
