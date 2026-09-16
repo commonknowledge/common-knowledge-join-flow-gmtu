@@ -197,20 +197,45 @@ function run_branch_retag(
     $people = [];
     $page = 0;
 
+    // Guards against a paging API that hands back the same page forever, which
+    // would otherwise walk until the process runs out of memory.
+    $seen = [];
+
     while ($limit === null || count($people) < $limit) {
         $batch = $list_people($page, $perPage);
         if (empty($batch)) {
             break;
         }
 
+        $newInBatch = 0;
+
         foreach ($batch as $person) {
             $personId = $person['id'] ?? null;
+            $key = $personId ?? ($person['email'] ?? null);
+
+            if ($key === null) {
+                log_warning('Skipping a Zetkin record with neither an id nor an email');
+                continue;
+            }
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $newInBatch++;
+
             $people[] = [
                 'id' => $personId,
                 'email' => $person['email'] ?? '',
                 'zip_code' => $person['zip_code'] ?? '',
                 'tags' => array_column($get_tags($personId), 'title'),
             ];
+        }
+
+        if ($newInBatch === 0) {
+            log_warning("Zetkin returned no new people on page $page, stopping the walk there. "
+                . "Check that the people endpoint is paging as expected.");
+            break;
         }
 
         $page++;

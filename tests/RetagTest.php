@@ -341,6 +341,35 @@ class RetagTest extends TestCase
         $this->assertCount(1, $result['actions']);
     }
 
+    /**
+     * If Zetkin ever ignored the page parameter, the walk would fetch the same
+     * first page forever. Stop instead of looping, and say why.
+     */
+    public function test_stops_if_paging_returns_the_same_people_again()
+    {
+        $page = [
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => []],
+            ['id' => 2, 'email' => 'b@example.com', 'zip_code' => 'M1 1AA', 'tags' => []],
+        ];
+
+        // Bounded so that a regression fails the test rather than hanging the
+        // suite until PHP runs out of memory.
+        $calls = 0;
+        $lister = function ($p, $perPage) use ($page, &$calls) {
+            $calls++;
+            $this->assertLessThan(50, $calls, 'run_branch_retag kept paging over the same people');
+            return $page;
+        };
+        $tagsGetter = fn($personId) => [];
+        $resolver = fn($title) => ['id' => 1, 'title' => $title];
+        $adder = fn($personId, $tagId) => true;
+        $remover = fn($personId, $tagId) => true;
+
+        $result = run_branch_retag(false, null, $lister, $tagsGetter, $resolver, $adder, $remover);
+
+        $this->assertCount(2, $result['actions']);
+    }
+
     public function test_counts_summarise_the_run()
     {
         [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
