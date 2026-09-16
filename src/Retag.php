@@ -119,6 +119,37 @@ function plan_branch_retag(array $people, array $branchMap): array {
 }
 
 /**
+ * Check the parent plugin is new enough to do a bulk re-tag.
+ *
+ * The helpers this needs landed in Common Knowledge Join Flow 1.4.38. Against
+ * an older parent the run would fatal partway through, which on a write run
+ * could leave members half re-tagged, so refuse before touching anything.
+ *
+ * @since 1.5.12
+ *
+ * @throws \RuntimeException If the parent plugin is missing or out of date.
+ * @return void
+ */
+function require_zetkin_bulk_helpers() {
+    $required = [
+        'listPeople',
+        'getPersonTags',
+        'findOrCreateTagByTitle',
+        'addTagToPerson',
+        'removeTagFromPerson',
+    ];
+
+    foreach ($required as $method) {
+        if (!method_exists(ZetkinService::class, $method)) {
+            throw new \RuntimeException(
+                "ZetkinService::$method() is not available. Branch re-tagging needs "
+                . "Common Knowledge Join Flow 1.4.38 or newer. Update the parent plugin and try again."
+            );
+        }
+    }
+}
+
+/**
  * Walk the membership and bring branch tags into line with the branch map.
  *
  * Previews by default. Nothing is written unless $apply is true.
@@ -146,6 +177,16 @@ function run_branch_retag(
     ?callable $tag_adder = null,
     ?callable $tag_remover = null
 ): array {
+    $usingParentPlugin = $people_lister === null
+        || $tags_getter === null
+        || $tag_resolver === null
+        || $tag_adder === null
+        || $tag_remover === null;
+
+    if ($usingParentPlugin) {
+        require_zetkin_bulk_helpers();
+    }
+
     $list_people = $people_lister ?? fn($page, $perPage) => ZetkinService::listPeople($page, $perPage);
     $get_tags    = $tags_getter   ?? fn($personId) => ZetkinService::getPersonTags($personId);
     $resolve_tag = $tag_resolver  ?? fn($title) => ZetkinService::findOrCreateTagByTitle($title);

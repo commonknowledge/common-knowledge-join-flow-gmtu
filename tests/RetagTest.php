@@ -316,6 +316,31 @@ class RetagTest extends TestCase
         $this->assertCount(2, $calls->resolved);
     }
 
+    /**
+     * The command depends on Zetkin helpers added to the parent plugin in
+     * 1.4.38. Against an older parent it must say so, not fatal halfway
+     * through a run. ZetkinService does not exist in the test suite, so the
+     * default wiring stands in for an out-of-date parent.
+     */
+    public function test_refuses_to_run_against_a_parent_plugin_without_the_zetkin_helpers()
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/1\.4\.38/');
+
+        run_branch_retag();
+    }
+
+    public function test_injected_callables_do_not_need_the_parent_plugin()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => []],
+        ]);
+
+        $result = run_branch_retag(false, null, $lister, $tagsGetter, $resolver, $adder, $remover);
+
+        $this->assertCount(1, $result['actions']);
+    }
+
     public function test_counts_summarise_the_run()
     {
         [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([

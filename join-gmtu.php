@@ -136,7 +136,12 @@ if (defined('WP_CLI') && WP_CLI) {
             \WP_CLI::log('PREVIEW. Nothing will be written. Re-run with --apply to make these changes.');
         }
 
-        $result = run_branch_retag($apply, $limit);
+        try {
+            $result = run_branch_retag($apply, $limit);
+        } catch (\RuntimeException $e) {
+            \WP_CLI::error($e->getMessage());
+            return;
+        }
 
         $rows = [];
         foreach ($result['actions'] as $action) {
@@ -152,6 +157,14 @@ if (defined('WP_CLI') && WP_CLI) {
                 'remove' => implode(', ', $action['removeTags']),
                 'reason' => $action['reason'],
             ];
+        }
+
+        if (empty($result['actions'])) {
+            \WP_CLI::warning(
+                'Zetkin returned no members, so nothing was checked. '
+                . 'Confirm ZETKIN_CLIENT_ID, ZETKIN_CLIENT_SECRET and ZETKIN_JWT are configured.'
+            );
+            return;
         }
 
         if (empty($rows)) {
