@@ -33,7 +33,9 @@ if (! defined('ABSPATH')) exit; // Exit if accessed directly
  *    - Fired before the join is processed.
  *    - Receives: $data (member registration data)
  *    - We look up the postcode outcode, find the branch, and inject it into
- *      $data["branch"] and $data["customFields"]["branch"].
+ *      $data["branch"] only. Never customFields: Zetkin rejects branch as a
+ *      person field and the whole signup fails. See README, "Zetkin: tagging
+ *      only, never a custom field".
  *
  * 4. ck_join_flow_add_tags (filter, Tagging.php)
  *    - Fired when tagging a member in external services (Mailchimp, Zetkin, etc.)
