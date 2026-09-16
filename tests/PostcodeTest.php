@@ -4,6 +4,7 @@ namespace CommonKnowledge\JoinBlock\Organisation\GMTU\Tests;
 
 use Brain\Monkey\Functions;
 use function CommonKnowledge\JoinBlock\Organisation\GMTU\get_postcode_outcode;
+use function CommonKnowledge\JoinBlock\Organisation\GMTU\parse_outcode;
 
 class PostcodeTest extends TestCase
 {
@@ -156,5 +157,66 @@ class PostcodeTest extends TestCase
         get_postcode_outcode('M1 1AA');
 
         $this->assertFalse($setCalled);
+    }
+
+    // parse_outcode: offline outcode parsing, used by bulk jobs that cannot
+    // afford one postcodes.io call per member.
+
+    /**
+     * @dataProvider outcodeProvider
+     */
+    public function test_parses_outcode_offline($postcode, $expected)
+    {
+        $this->assertSame($expected, parse_outcode($postcode));
+    }
+
+    public function outcodeProvider()
+    {
+        return [
+            'standard, with space' => ['M1 1AA', 'M1'],
+            'two digit district' => ['M50 3AH', 'M50'],
+            'two letter area' => ['BL1 1AA', 'BL1'],
+            'three character outcode with letter suffix' => ['M3 4LZ', 'M3'],
+            'no space' => ['M11AA', 'M1'],
+            'no space, long outcode' => ['WN70AB', 'WN7'],
+            'lowercase' => ['m1 1aa', 'M1'],
+            'leading and trailing whitespace' => ['  M1 1AA  ', 'M1'],
+            'multiple internal spaces' => ['M1  1AA', 'M1'],
+            'already just an outcode' => ['M1', 'M1'],
+            'lettered district' => ['W1A 0AX', 'W1A'],
+        ];
+    }
+
+    /**
+     * @dataProvider unparseableProvider
+     */
+    public function test_returns_null_for_unparseable_postcode($postcode)
+    {
+        $this->assertNull(parse_outcode($postcode));
+    }
+
+    public function unparseableProvider()
+    {
+        return [
+            'empty' => [''],
+            'whitespace only' => ['   '],
+            'null' => [null],
+            'too short' => ['M'],
+            'digits only' => ['12345'],
+            'not a postcode' => ['NOT A POSTCODE'],
+        ];
+    }
+
+    public function test_parse_outcode_makes_no_api_call()
+    {
+        $called = false;
+        Functions\when('wp_remote_get')->alias(function () use (&$called) {
+            $called = true;
+            return [];
+        });
+
+        parse_outcode('M1 1AA');
+
+        $this->assertFalse($called);
     }
 }
