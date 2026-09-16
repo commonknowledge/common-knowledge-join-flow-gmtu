@@ -5,7 +5,7 @@ This add-on to the main [Join Flow plugin](https://github.com/commonknowledge/jo
 ## Features
 
 - **Postcode validation** — Validates that postcodes are within the Greater Manchester coverage area and blocks out-of-area submissions with helpful error messages.
-- **Branch assignment** — Automatically assigns members to a branch (e.g. South Manchester, Harpurhey, Stockport) based on their postcode outcode.
+- **Branch assignment** — Automatically assigns members to a branch (e.g. City Centre and Salford, South Manchester, Harpurhey, Stockport) based on their postcode outcode.
 - **Branch tagging** — Adds the assigned branch name as a tag when members are synced to external services (Mailchimp, Zetkin, etc.).
 - **Email notifications** — Sends admin and branch-specific notification emails when a new member registers.
 - **Postcode lookup caching** — Caches postcodes.io API responses as WordPress transients (7-day TTL) to reduce external API calls.
@@ -26,6 +26,31 @@ The parent plugin fires hooks at each stage of member registration and membershi
 | 7 | `ck_join_flow_success` (action, priority 20) | `Notifications.php` | Send branch-specific notification email |
 | 8 | `ck_join_flow_should_lapse_member` (filter) | `LapsingOverride.php` | Override lapse decision using GMTU standing rules (see below) |
 | 9 | `ck_join_flow_should_unlapse_member` (filter) | `LapsingOverride.php` | Override unlapse decision using GMTU standing rules (see below) |
+
+## Branch mapping
+
+### Where the mapping comes from
+
+`get_branch_map()` in `src/Branch.php` is the single source of truth for which postcode outcode belongs to which branch. It is transcribed from GMTU's own "Branch postcode breakdown" spreadsheets (the `postcodes mcr` and `additional postcodes` tabs), not from any postcode dataset. When GMTU reorganise branches, the sheets change first and this map follows.
+
+The map does double duty: `PostcodeValidation.php` treats "is this outcode a key in the map" as "is this postcode in our coverage area". An outcode mapped to `null` is in area but has no branch yet. An outcode absent from the map altogether is rejected as out of area, so removing a key blocks people from joining.
+
+### City Centre and Salford
+
+GMTU split the old "South and Central" branch into **City Centre and Salford** and **South Manchester** (JOIN-151). `M1`, `M2` and `M3` moved off South Manchester, and `M17`, `M27`, `M28`, `M30` and `M38` gained a branch having previously had none.
+
+Four rows in the sheet look like leftovers from before the split and are deliberately left as the sheet has them, pending confirmation from GMTU. Each is pinned by a test in `tests/BranchTest.php` so the decision is visible in the suite rather than buried here:
+
+| Outcode | Areas | Sheet says | Why it looks wrong |
+|---|---|---|---|
+| `M4` | Arndale, Ancoats, Northern Quarter, Shudehill | South Manchester | City centre, sits alongside M1 to M3 |
+| `M5`, `M6`, `M7` | Ordsall, Weaste, Pendleton, Broughton, Kersal | No branch | Core Salford |
+| `M50` | Salford Quays, MediaCityUK | South Manchester | Salford |
+| `M44` | Irlam, Cadishead | No branch | Salford |
+
+### Branch names must match the CRM exactly
+
+`ZetkinService::findOrCreateTag` in the parent plugin creates a Zetkin tag from whatever string it is given. A typo in a branch name does not fail, it silently creates a second, near-identical tag and starts filling it with members. The strings in `get_branch_map()` are the tag titles, so treat them as data that has to match Zetkin, not as labels.
 
 ## Branch tagging
 
@@ -144,7 +169,7 @@ The main configuration is in `join-gmtu.php` and includes:
 - Admin notification email addresses
 - Notification subject and message templates
 
-Branch-to-postcode mappings and branch email addresses are in `src/Branch.php`.
+Branch-to-postcode mappings and branch email addresses are in `src/Branch.php`. See [Branch mapping](#branch-mapping) for where those mappings come from and why an absent outcode is not the same as a `null` one.
 
 ## Local Development
 
