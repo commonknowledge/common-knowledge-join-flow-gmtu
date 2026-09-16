@@ -65,6 +65,37 @@ class BranchAssignmentTest extends TestCase
         $this->assertSame('Moss Side', $result['branch']);
     }
 
+    /**
+     * End to end through the filter for the branch this ticket created: a city
+     * centre postcode must come out as City Centre and Salford, not South
+     * Manchester. See JOIN-151.
+     */
+    public function test_assigns_city_centre_and_salford_for_a_city_centre_postcode()
+    {
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
+
+        Functions\when('get_transient')->justReturn('M1');
+
+        $data = ['addressPostcode' => 'M1 1AA'];
+        $result = $handler($data);
+        $this->assertSame('City Centre and Salford', $result['branch']);
+    }
+
+    /**
+     * Swinton had no branch at all before JOIN-151, so these members were
+     * arriving in the CRM untagged.
+     */
+    public function test_assigns_city_centre_and_salford_for_a_salford_postcode()
+    {
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
+
+        Functions\when('get_transient')->justReturn('M27');
+
+        $data = ['addressPostcode' => 'M27 4AA'];
+        $result = $handler($data);
+        $this->assertSame('City Centre and Salford', $result['branch']);
+    }
+
     public function test_sets_null_branch_for_null_mapping()
     {
         $handler = $this->registerBranchAssignmentAndCaptureHandler();
