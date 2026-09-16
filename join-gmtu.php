@@ -80,6 +80,7 @@ require_once __DIR__ . '/src/MembershipStanding.php';
 require_once __DIR__ . '/src/LapsedStore.php';
 require_once __DIR__ . '/src/StripePaymentHistory.php';
 require_once __DIR__ . '/src/LapsingOverride.php';
+require_once __DIR__ . '/src/Retag.php';
 
 // Configuration
 $config = [
@@ -99,3 +100,89 @@ register_branch_assignment();
 register_tagging();
 register_notifications($config);
 register_lapsing_override();
+
+if (defined('WP_CLI') && WP_CLI) {
+    /**
+     * Bring existing members' branch tags into line with the branch map.
+     *
+     * New signups are tagged from src/Branch.php as they join, but nothing
+     * revisits existing members when a branch is renamed, split or added. This
+     * recalculates every member's branch from their postcode and fixes the
+     * difference.
+     *
+     * Previews by default: it writes nothing at all unless --apply is passed.
+     * Only branch tags are ever touched, and an old branch tag is only removed
+     * once the correct one has been applied.
+     *
+     * ## OPTIONS
+     *
+     * [--apply]
+     * : Actually write the changes. Without it, the command only reports.
+     *
+     * [--limit=<number>]
+     * : Stop after this many members. Worth doing a small pass first.
+     *
+     * ## EXAMPLES
+     *
+     *     wp gmtu retag_branches
+     *     wp gmtu retag_branches --limit=10
+     *     wp gmtu retag_branches --limit=10 --apply
+     */
+    \WP_CLI::add_command('gmtu retag_branches', function ($args, $assocArgs) {
+        $apply = !empty($assocArgs['apply']);
+        $limit = isset($assocArgs['limit']) ? (int) $assocArgs['limit'] : null;
+
+        if (!$apply) {
+            \WP_CLI::log('PREVIEW. Nothing will be written. Re-run with --apply to make these changes.');
+        }
+
+        $result = run_branch_retag($apply, $limit);
+
+        $rows = [];
+        foreach ($result['actions'] as $action) {
+            if ($action['status'] === 'unchanged') {
+                continue;
+            }
+            $rows[] = [
+                'email' => $action['email'],
+                'postcode' => $action['postcode'],
+                'outcode' => $action['outcode'] ?? '',
+                'status' => $action['status'],
+                'add' => $action['addTag'] ?? '',
+                'remove' => implode(', ', $action['removeTags']),
+                'reason' => $action['reason'],
+            ];
+        }
+
+        if (empty($rows)) {
+            \WP_CLI::success('Every member is already on the right branch.');
+            return;
+        }
+
+        \WP_CLI\Utils\format_items(
+            'table',
+            $rows,
+            ['email', 'postcode', 'outcode', 'status', 'add', 'remove', 'reason']
+        );
+
+        $counts = $result['counts'];
+        \WP_CLI::log('');
+        \WP_CLI::log("Moved to a different branch: {$counts['move']}");
+        \WP_CLI::log("Given a branch they did not have: {$counts['add']}");
+        \WP_CLI::log("Stale branch tag taken off: {$counts['remove']}");
+        \WP_CLI::log("Already correct: {$counts['unchanged']}");
+        \WP_CLI::log("Needs a decision from GMTU: {$counts['review']}");
+        \WP_CLI::log("Could not be classified: {$counts['skipped']}");
+
+        if ($counts['failed'] > 0) {
+            \WP_CLI::warning("Failed part way through: {$counts['failed']}. See the log for details.");
+        }
+
+        if ($apply) {
+            \WP_CLI::success('Branch tags updated.');
+        } else {
+            \WP_CLI::log('');
+            \WP_CLI::log('Nothing was written. Re-run with --apply to make these changes.');
+        }
+    });
+}

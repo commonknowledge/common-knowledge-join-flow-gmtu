@@ -37,3 +37,4 @@ require_once dirname(__DIR__) . '/src/MembershipStanding.php';
 require_once dirname(__DIR__) . '/src/LapsedStore.php';
 require_once dirname(__DIR__) . '/src/StripePaymentHistory.php';
 require_once dirname(__DIR__) . '/src/LapsingOverride.php';
+require_once dirname(__DIR__) . '/src/Retag.php';
