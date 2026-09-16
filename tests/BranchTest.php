@@ -35,10 +35,10 @@ class BranchTest extends TestCase
         $this->assertArrayNotHasKey('EC1', $map);
     }
 
-    public function test_get_branch_map_maps_m1_to_south_manchester()
+    public function test_get_branch_map_maps_m1_to_city_centre_and_salford()
     {
         $map = get_branch_map();
-        $this->assertSame('South Manchester', $map['M1']);
+        $this->assertSame('City Centre and Salford', $map['M1']);
     }
 
     public function test_get_branch_map_maps_m8_to_harpurhey()
@@ -94,9 +94,9 @@ class BranchTest extends TestCase
 
     // get_branch_for_outcode — one test per branch
 
-    public function test_outcode_m1_resolves_to_south_manchester()
+    public function test_outcode_m1_resolves_to_city_centre_and_salford()
     {
-        $this->assertSame('South Manchester', get_branch_for_outcode('M1'));
+        $this->assertSame('City Centre and Salford', get_branch_for_outcode('M1'));
     }
 
     public function test_outcode_m8_resolves_to_harpurhey()
@@ -185,5 +185,79 @@ class BranchTest extends TestCase
     public function test_unknown_outcode_resolves_to_null()
     {
         $this->assertNull(get_branch_for_outcode('SW1'));
+    }
+
+    // City Centre and Salford, the branch split out of the old "South and Central".
+    // Outcodes and branch names come from GMTU's branch postcode breakdown sheets.
+
+    /**
+     * @dataProvider cityCentreAndSalfordOutcodeProvider
+     */
+    public function test_outcode_resolves_to_city_centre_and_salford($outcode)
+    {
+        $this->assertSame('City Centre and Salford', get_branch_for_outcode($outcode));
+    }
+
+    public function cityCentreAndSalfordOutcodeProvider()
+    {
+        return [
+            'M1 Piccadilly, Market Street, Gay Village' => ['M1'],
+            'M2 Deansgate' => ['M2'],
+            'M3 City Centre, Castlefield, Blackfriars, Greengate' => ['M3'],
+            'M17 Trafford Park' => ['M17'],
+            'M27 Swinton, Clifton, Pendlebury' => ['M27'],
+            'M28 Worsley, Walkden, Boothstown' => ['M28'],
+            'M30 Eccles, Monton, Peel Green, Winton' => ['M30'],
+            'M38 Little Hulton' => ['M38'],
+        ];
+    }
+
+    /**
+     * South Manchester keeps the outcodes GMTU's sheet leaves with it.
+     *
+     * @dataProvider southManchesterOutcodeProvider
+     */
+    public function test_outcode_still_resolves_to_south_manchester($outcode)
+    {
+        $this->assertSame('South Manchester', get_branch_for_outcode($outcode));
+    }
+
+    public function southManchesterOutcodeProvider()
+    {
+        return [
+            'M20 Didsbury, Withington' => ['M20'],
+            'M21 Chorlton-cum-Hardy' => ['M21'],
+            'M22 Wythenshawe, Northenden' => ['M22'],
+            'M23 Baguley, Brooklands' => ['M23'],
+            'M50 Salford Quays, MediaCityUK' => ['M50'],
+        ];
+    }
+
+    /**
+     * M4 (Arndale, Ancoats, Northern Quarter) is city centre but GMTU's sheet
+     * still has it on South Manchester. We follow the sheet rather than guess.
+     * Raised with GMTU on JOIN-151; flip this test when they confirm.
+     */
+    public function test_outcode_m4_follows_the_sheet_and_stays_on_south_manchester()
+    {
+        $this->assertSame('South Manchester', get_branch_for_outcode('M4'));
+    }
+
+    /**
+     * Likewise M5, M6, M7 and M44 are Salford but the sheet leaves them unassigned.
+     */
+    public function test_salford_outcodes_the_sheet_leaves_unassigned_resolve_to_null()
+    {
+        $this->assertNull(get_branch_for_outcode('M5'));
+        $this->assertNull(get_branch_for_outcode('M6'));
+        $this->assertNull(get_branch_for_outcode('M7'));
+        $this->assertNull(get_branch_for_outcode('M44'));
+    }
+
+    public function test_branch_email_map_city_centre_and_salford_has_null_email()
+    {
+        $map = get_branch_email_map();
+        $this->assertArrayHasKey('City Centre and Salford', $map);
+        $this->assertNull($map['City Centre and Salford']);
     }
 }

@@ -18,9 +18,9 @@ namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
  */
 function get_branch_map() {
     return [
-        "M1" => "South Manchester",
-        "M2" => "South Manchester",
-        "M3" => "South Manchester",
+        "M1" => "City Centre and Salford",
+        "M2" => "City Centre and Salford",
+        "M3" => "City Centre and Salford",
         "M4" => "South Manchester",
         "M5" => null,
         "M6" => null,
@@ -33,7 +33,7 @@ function get_branch_map() {
         "M14" => "Moss Side",
         "M15" => "Hulme",
         "M16" => "Moss Side",
-        "M17" => null,
+        "M17" => "City Centre and Salford",
         "M18" => "Leve-Longsight",
         "M19" => "Leve-Longsight",
         "M20" => "South Manchester",
@@ -43,16 +43,16 @@ function get_branch_map() {
         "M24" => "Middleton",
         "M25" => null,
         "M26" => null,
-        "M27" => null,
-        "M28" => null,
+        "M27" => "City Centre and Salford",
+        "M28" => "City Centre and Salford",
         "M29" => null,
-        "M30" => null,
+        "M30" => "City Centre and Salford",
         "M31" => null,
         "M32" => null,
         "M33" => null,
         "M34" => null,
         "M35" => null,
-        "M38" => null,
+        "M38" => "City Centre and Salford",
         "M40" => "Harpurhey",
         "M41" => null,
         "M43" => null,
@@ -129,6 +129,7 @@ function get_branch_map() {
  */
 function get_branch_email_map() {
     return [
+        "City Centre and Salford" => null,
         "South Manchester" => 'south.mcr@tenantsunion.org.uk',
         "Harpurhey" => 'harpurhey@tenantsunion.org.uk',
         "Leve-Longsight" => 'levenshulme-longsight@tenantsunion.org.uk',
