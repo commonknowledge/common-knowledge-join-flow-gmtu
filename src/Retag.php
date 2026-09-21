@@ -356,7 +356,7 @@ function run_branch_retag(
 
         // Only once Zetkin is settled. Pushing a change to Mailchimp after a
         // failed Zetkin write would drive the two further apart, not together.
-        $mailchimpResult = 'ok';
+        $mailchimpResult = MailchimpService::TAG_OK;
 
         if ($action['addTag'] !== null) {
             $mailchimpResult = $mc_add_tag($action['email'], $action['addTag']);
@@ -364,10 +364,10 @@ function run_branch_retag(
 
         // Add before remove here too, so an interruption leaves a member
         // over-tagged in Mailchimp rather than with no branch at all.
-        if ($mailchimpResult === 'ok') {
+        if ($mailchimpResult === MailchimpService::TAG_OK) {
             foreach ($action['removeTags'] as $title) {
                 $status = $mc_remove_tag($action['email'], $title);
-                if ($status !== 'ok') {
+                if ($status !== MailchimpService::TAG_OK) {
                     $mailchimpResult = $status;
                     break;
                 }
@@ -376,9 +376,9 @@ function run_branch_retag(
 
         $actions[$index]['mailchimp'] = $mailchimpResult;
 
-        if ($mailchimpResult === 'ok') {
+        if ($mailchimpResult === MailchimpService::TAG_OK) {
             $counts['mailchimpUpdated']++;
-        } elseif ($mailchimpResult === 'not_found') {
+        } elseif ($mailchimpResult === MailchimpService::TAG_NOT_FOUND) {
             $counts['mailchimpNotFound']++;
             log_info("{$action['email']} is not in the Mailchimp audience, so only Zetkin was updated");
         } else {
