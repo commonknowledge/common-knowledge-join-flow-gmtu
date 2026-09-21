@@ -159,11 +159,11 @@ class BranchTest extends TestCase
         $this->assertSame('Wigan', get_branch_for_outcode('WA3'));
     }
 
-    public function test_outcode_bl8_resolves_to_null_no_branch()
+    public function test_outcode_wa13_resolves_to_null_no_branch()
     {
         $map = get_branch_map();
-        $this->assertArrayHasKey('BL8', $map);
-        $this->assertNull(get_branch_for_outcode('BL8'));
+        $this->assertArrayHasKey('WA13', $map);
+        $this->assertNull(get_branch_for_outcode('WA13'));
     }
 
     public function test_outcode_wa14_resolves_to_null_no_branch()
@@ -280,6 +280,8 @@ class BranchTest extends TestCase
             'M25 Prestwich, Sedgley Park, Simister' => ['M25'],
             'M26 Radcliffe, Stoneclough' => ['M26'],
             'M45 Whitefield, Besses o\' th\' Barn' => ['M45'],
+            'BL8 Bury centre, Tottington, Ramsbottom' => ['BL8'],
+            'BL9 Bury centre, Summerseat, Walmersley' => ['BL9'],
         ];
     }
 
@@ -290,13 +292,4 @@ class BranchTest extends TestCase
         $this->assertNull($map['Bury']);
     }
 
-    /**
-     * BL8 and BL9 are Bury town itself, but the sheet still leaves them
-     * unassigned even though it now gives Bury a branch. Raised on JOIN-151.
-     */
-    public function test_bury_town_outcodes_follow_the_sheet_and_stay_unassigned()
-    {
-        $this->assertNull(get_branch_for_outcode('BL8'));
-        $this->assertNull(get_branch_for_outcode('BL9'));
-    }
 }

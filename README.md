@@ -41,12 +41,13 @@ GMTU split the old "South and Central" branch into **City Centre and Salford** a
 
 A revised sheet then moved `M5`, `M6`, `M7`, `M44` and `M50` onto City Centre and Salford as well, gave the branch its own address (`citycentre@tenantsunion.org.uk`), added a **Bury** branch covering `M25`, `M26` and `M45`, and gave Rochdale `OL10` and `OL15`.
 
-Two rows still look like leftovers from before the split. They are deliberately left as the sheet has them, pending confirmation from GMTU, and each is pinned by a test in `tests/BranchTest.php` so the decision is visible in the suite rather than buried here:
+**Bury** also covers `BL8` and `BL9`, which is Bury town itself. The sheet has both as "No branch", left over from before the Bury branch existed, so Prestwich and Radcliffe would have had a Bury branch and Bury would not. GMTU confirmed the branch should cover the town, so this is the one place the map deliberately departs from the sheet. `tests/BranchTest.php` pins it.
+
+One row is still left exactly as the sheet has it, pending confirmation from GMTU, and is pinned by a test so the decision is visible in the suite rather than buried here:
 
 | Outcode | Areas | Sheet says | Why it looks wrong |
 |---|---|---|---|
 | `M4` | Arndale, Ancoats, Northern Quarter, Shudehill | South Manchester | City centre, sits alongside M1 to M3, which all moved |
-| `BL8`, `BL9` | Bury centre, Tottington, Ramsbottom | No branch | Bury town itself, now that a Bury branch exists |
 
 ### Branch names must match the CRM exactly
 

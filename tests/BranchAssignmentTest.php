@@ -111,10 +111,10 @@ class BranchAssignmentTest extends TestCase
     {
         $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
-        // BL8 is in the branch map but deliberately has no branch
-        Functions\when('get_transient')->justReturn('BL8');
+        // WA13 is in the branch map but deliberately has no branch
+        Functions\when('get_transient')->justReturn('WA13');
 
-        $data = ['addressPostcode' => 'BL8 1AA'];
+        $data = ['addressPostcode' => 'WA13 0AA'];
         $result = $handler($data);
         $this->assertNull($result['branch']);
     }
