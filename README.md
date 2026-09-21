@@ -31,7 +31,7 @@ The parent plugin fires hooks at each stage of member registration and membershi
 
 Changing the branch map only affects people who join after the change. Nothing in the join flow revisits an existing member, so after a branch is renamed, split or added, everyone who joined before it keeps the tag they were given at the time.
 
-`wp gmtu retag_branches` recalculates each member's branch from their postcode in Zetkin and fixes the difference. It needs Common Knowledge Join Flow **1.4.38 or newer** for the bulk Zetkin helpers, and refuses to start against anything older rather than failing part way through a run. It previews by default and writes nothing without `--apply`:
+`wp gmtu retag_branches` recalculates each member's branch from their postcode in Zetkin and fixes the difference in **both Zetkin and Mailchimp**. It needs Common Knowledge Join Flow **1.4.39 or newer** for the bulk Zetkin and Mailchimp helpers, and refuses to start against anything older rather than failing part way through a run. It previews by default and writes nothing without `--apply`:
 
 ```bash
 wp gmtu retag_branches                    # report only, writes nothing
@@ -41,6 +41,10 @@ wp gmtu retag_branches --apply            # the full run
 ```
 
 Only tags whose titles are branch names in `get_branch_map()` are ever removed; every other tag is left alone. A stale branch tag comes off only once the correct one is on, so an interrupted run leaves a member over-tagged rather than untagged. Where an outcode maps to `null`, an existing branch tag is reported for review rather than stripped.
+
+Both Zetkin and Mailchimp are updated. The plan is built from Zetkin, because it holds the postcode the branch is calculated from; Mailchimp only receives a postcode inside the `ADDRESS` merge field, which the parent plugin omits on update flows and when no street address was collected. Mailchimp is matched on email afterwards, and only once the Zetkin write for that member has succeeded.
+
+Anyone in Mailchimp but not in Zetkin is therefore never reached, so Mailchimp outcomes are counted separately rather than folded into the totals. If Mailchimp is not configured the run still does its Zetkin job and says so.
 ## Branch tagging
 
 ### Why this exists
