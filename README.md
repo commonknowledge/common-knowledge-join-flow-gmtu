@@ -41,13 +41,16 @@ GMTU split the old "South and Central" branch into **City Centre and Salford** a
 
 A revised sheet then moved `M5`, `M6`, `M7`, `M44` and `M50` onto City Centre and Salford as well, gave the branch its own address (`citycentre@tenantsunion.org.uk`), added a **Bury** branch covering `M25`, `M26` and `M45`, and gave Rochdale `OL10` and `OL15`.
 
-**Bury** also covers `BL8` and `BL9`, which is Bury town itself. The sheet has both as "No branch", left over from before the Bury branch existed, so Prestwich and Radcliffe would have had a Bury branch and Bury would not. GMTU confirmed the branch should cover the town, so this is the one place the map deliberately departs from the sheet. `tests/BranchTest.php` pins it.
+Three rows in the sheet were left over from before the split, and GMTU have since confirmed all three. The map follows the confirmations rather than the sheet, and `tests/BranchTest.php` pins each one:
 
-One row is still left exactly as the sheet has it, pending confirmation from GMTU, and is pinned by a test so the decision is visible in the suite rather than buried here:
-
-| Outcode | Areas | Sheet says | Why it looks wrong |
+| Outcode | Areas | Sheet said | Confirmed as |
 |---|---|---|---|
-| `M4` | Arndale, Ancoats, Northern Quarter, Shudehill | South Manchester | City centre, sits alongside M1 to M3, which all moved |
+| `M4` | Arndale, Ancoats, Northern Quarter, Shudehill | South Manchester | City Centre and Salford, alongside M1 to M3 |
+| `BL8`, `BL9` | Bury centre, Tottington, Ramsbottom, Summerseat | No branch | Bury, which is Bury town itself |
+
+The South Manchester notification address is the third. The sheet spells it `southmcr@tenantsunion.org.uk`; GMTU confirmed the live address is `south.mcr@tenantsunion.org.uk`, with the dot, so the map keeps that.
+
+Where the sheet and this map disagree, the map is right and the sheet is stale. Worth remembering next time the sheets are re-imported, because a careless transcription would undo all three.
 
 ### Branch names must match the CRM exactly
 

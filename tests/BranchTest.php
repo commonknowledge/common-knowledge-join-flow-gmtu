@@ -76,7 +76,7 @@ class BranchTest extends TestCase
     public function test_get_branch_email_map_maps_south_manchester()
     {
         $map = get_branch_email_map();
-        $this->assertSame('southmcr@tenantsunion.org.uk', $map['South Manchester']);
+        $this->assertSame('south.mcr@tenantsunion.org.uk', $map['South Manchester']);
     }
 
     public function test_get_branch_email_map_maps_hulme()
@@ -224,6 +224,7 @@ class BranchTest extends TestCase
             'M7 Higher and Lower Broughton, Kersal' => ['M7'],
             'M44 Irlam, Cadishead' => ['M44'],
             'M50 Salford Quays, MediaCityUK' => ['M50'],
+            'M4 Arndale, Ancoats, Northern Quarter, Shudehill' => ['M4'],
         ];
     }
 
@@ -245,17 +246,6 @@ class BranchTest extends TestCase
             'M22 Wythenshawe, Northenden' => ['M22'],
             'M23 Baguley, Brooklands' => ['M23'],
         ];
-    }
-
-    /**
-     * M4 (Arndale, Ancoats, Northern Quarter) is city centre but GMTU's sheet
-     * still has it on South Manchester, in the revised sheet as well as the first.
-     * We follow the sheet rather than guess. Raised with GMTU twice on JOIN-151;
-     * flip this test when they confirm.
-     */
-    public function test_outcode_m4_follows_the_sheet_and_stays_on_south_manchester()
-    {
-        $this->assertSame('South Manchester', get_branch_for_outcode('M4'));
     }
 
     public function test_branch_email_map_maps_city_centre_and_salford()

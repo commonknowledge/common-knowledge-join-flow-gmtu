@@ -21,7 +21,7 @@ function get_branch_map() {
         "M1" => "City Centre and Salford",
         "M2" => "City Centre and Salford",
         "M3" => "City Centre and Salford",
-        "M4" => "South Manchester",
+        "M4" => "City Centre and Salford",
         "M5" => "City Centre and Salford",
         "M6" => "City Centre and Salford",
         "M7" => "City Centre and Salford",
@@ -130,7 +130,7 @@ function get_branch_map() {
 function get_branch_email_map() {
     return [
         "City Centre and Salford" => 'citycentre@tenantsunion.org.uk',
-        "South Manchester" => 'southmcr@tenantsunion.org.uk',
+        "South Manchester" => 'south.mcr@tenantsunion.org.uk',
         "Harpurhey" => 'harpurhey@tenantsunion.org.uk',
         "Leve-Longsight" => 'levenshulme-longsight@tenantsunion.org.uk',
         "Moss Side" => 'moss-side@tenantsunion.org.uk',
