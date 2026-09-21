@@ -225,11 +225,11 @@ class RetagTest extends TestCase
         };
         $adder = function ($personId, $tagId) use ($calls) {
             $calls->added[] = [$personId, $tagId];
-            return true;
+            return 'ok';
         };
         $remover = function ($personId, $tagId) use ($calls) {
             $calls->removed[] = [$personId, $tagId];
-            return true;
+            return 'ok';
         };
 
         return [$lister, $tagsGetter, $resolver, $adder, $remover, $calls];
@@ -549,7 +549,7 @@ class RetagTest extends TestCase
         [$lister, $tagsGetter, $resolver, , $remover] = $this->fakeZetkin([
             ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
         ]);
-        $failingAdder = fn($personId, $tagId) => false;
+        $failingAdder = fn($personId, $tagId) => 'error';
         [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
 
         $result = run_branch_retag(
@@ -611,5 +611,51 @@ class RetagTest extends TestCase
         $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
 
         $this->assertTrue($result['mailchimpEnabled']);
+    }
+
+    // The Zetkin callables report ZetkinService::TAG_* statuses. A non-empty
+    // string is truthy, so a truthiness check would count 'error' as success;
+    // these pin the comparisons against the constants.
+
+    public function test_a_zetkin_error_status_counts_as_failed()
+    {
+        [$lister, $tagsGetter, $resolver, , $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        $erroringAdder = fn($personId, $tagId) => 'error';
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $erroringAdder, $remover);
+
+        $this->assertSame(1, $result['counts']['failed']);
+        $this->assertSame(0, $result['counts']['move']);
+    }
+
+    public function test_a_zetkin_error_on_removal_counts_as_failed()
+    {
+        [$lister, $tagsGetter, $resolver, $adder] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        $erroringRemover = fn($personId, $tagId) => 'error';
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $erroringRemover);
+
+        $this->assertSame(1, $result['counts']['failed']);
+    }
+
+    /**
+     * Removing a tag the person did not have is Zetkin saying the end state
+     * is already true, not a failure.
+     */
+    public function test_a_missing_tag_on_removal_still_counts_as_success()
+    {
+        [$lister, $tagsGetter, $resolver, $adder] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        $missingRemover = fn($personId, $tagId) => 'missing';
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $missingRemover);
+
+        $this->assertSame(0, $result['counts']['failed']);
+        $this->assertSame(1, $result['counts']['move']);
     }
 }

@@ -179,8 +179,8 @@ function require_parent_plugin_helpers() {
  * @param callable|null $people_lister fn(int $page, int $perPage): array
  * @param callable|null $tags_getter   fn($personId): array of tag records
  * @param callable|null $tag_resolver  fn(string $title): ?array tag record
- * @param callable|null $tag_adder     fn($personId, $tagId): bool
- * @param callable|null $tag_remover   fn($personId, $tagId): bool
+ * @param callable|null $tag_adder     fn($personId, $tagId): string, a ZetkinService::TAG_* value
+ * @param callable|null $tag_remover   fn($personId, $tagId): string, a ZetkinService::TAG_* value
  * @param callable|null $mc_tag_adder   fn(string $email, string $tag): string
  * @param callable|null $mc_tag_remover fn(string $email, string $tag): string
  * @return array{actions: array, counts: array, applied: bool, mailchimpEnabled: bool}
@@ -322,7 +322,7 @@ function run_branch_retag(
 
         if ($action['addTag'] !== null) {
             $tagId = $resolve($action['addTag']);
-            $ok = $tagId !== null && $add_tag($action['id'], $tagId);
+            $ok = $tagId !== null && $add_tag($action['id'], $tagId) === ZetkinService::TAG_OK;
             if ($ok) {
                 log_info("Tagged {$action['email']} as {$action['addTag']}");
             } else {
@@ -336,7 +336,10 @@ function run_branch_retag(
         if ($ok) {
             foreach ($action['removeTags'] as $title) {
                 $tagId = $resolve($title);
-                if ($tagId === null || !$remove_tag($action['id'], $tagId)) {
+                // A missing tag means the end state is already true, which is
+                // as good as removed.
+                $removed = $tagId === null ? ZetkinService::TAG_ERROR : $remove_tag($action['id'], $tagId);
+                if (!in_array($removed, [ZetkinService::TAG_OK, ZetkinService::TAG_MISSING], true)) {
                     $ok = false;
                     log_warning("Could not remove tag $title from {$action['email']}");
                     continue;
