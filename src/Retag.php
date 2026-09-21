@@ -132,8 +132,8 @@ function plan_branch_retag(array $people, array $branchMap): array {
  * @throws \RuntimeException If the parent plugin is missing or out of date.
  * @return void
  */
-function require_parent_plugin_helpers() {
-    $required = [
+function parent_plugin_required_helpers() {
+    return [
         ZetkinService::class => [
             'listPeople',
             'getPersonTags',
@@ -147,8 +147,10 @@ function require_parent_plugin_helpers() {
             'tryRemoveTag',
         ],
     ];
+}
 
-    foreach ($required as $class => $methods) {
+function require_parent_plugin_helpers() {
+    foreach (parent_plugin_required_helpers() as $class => $methods) {
         $shortName = substr((string) strrchr($class, '\\'), 1);
 
         foreach ($methods as $method) {

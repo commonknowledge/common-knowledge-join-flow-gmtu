@@ -2,6 +2,7 @@
 
 namespace CommonKnowledge\JoinBlock\Organisation\GMTU\Tests;
 
+use function CommonKnowledge\JoinBlock\Organisation\GMTU\parent_plugin_required_helpers;
 use function CommonKnowledge\JoinBlock\Organisation\GMTU\plan_branch_retag;
 use function CommonKnowledge\JoinBlock\Organisation\GMTU\run_branch_retag;
 
@@ -332,15 +333,29 @@ class RetagTest extends TestCase
     }
 
     /**
-     * The Mailchimp helpers are as much a requirement as the Zetkin ones, so
-     * a parent that has one set but not the other must still be refused.
+     * The guard checks Zetkin first and neither service exists in this suite,
+     * so a run always fails on Zetkin and never reaches the Mailchimp names.
+     * Assert on the requirement list itself, otherwise dropping a Mailchimp
+     * helper from it would go unnoticed until a live run fataled mid-write.
      */
-    public function test_refuses_to_run_against_a_parent_plugin_without_the_mailchimp_helpers()
+    public function test_mailchimp_helpers_are_required_of_the_parent_plugin()
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/MailchimpService|ZetkinService/');
+        $required = parent_plugin_required_helpers();
 
-        run_branch_retag();
+        $this->assertSame(
+            ['isConfigured', 'tryAddTag', 'tryRemoveTag'],
+            $required['CommonKnowledge\\JoinBlock\\Services\\MailchimpService']
+        );
+    }
+
+    public function test_zetkin_helpers_are_required_of_the_parent_plugin()
+    {
+        $required = parent_plugin_required_helpers();
+
+        $this->assertSame(
+            ['listPeople', 'getPersonTags', 'findOrCreateTagByTitle', 'addTagToPerson', 'removeTagFromPerson'],
+            $required['CommonKnowledge\\JoinBlock\\Services\\ZetkinService']
+        );
     }
 
     public function test_injected_callables_do_not_need_the_parent_plugin()
