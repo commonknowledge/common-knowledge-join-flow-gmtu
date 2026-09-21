@@ -129,7 +129,7 @@ function get_branch_map() {
  */
 function get_branch_email_map() {
     return [
-        "City Centre and Salford" => null,
+        "City Centre and Salford" => 'citycentre@tenantsunion.org.uk',
         "South Manchester" => 'south.mcr@tenantsunion.org.uk',
         "Harpurhey" => 'harpurhey@tenantsunion.org.uk',
         "Leve-Longsight" => 'levenshulme-longsight@tenantsunion.org.uk',

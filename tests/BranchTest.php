@@ -258,11 +258,10 @@ class BranchTest extends TestCase
         $this->assertSame('South Manchester', get_branch_for_outcode('M4'));
     }
 
-    public function test_branch_email_map_city_centre_and_salford_has_null_email()
+    public function test_branch_email_map_maps_city_centre_and_salford()
     {
         $map = get_branch_email_map();
-        $this->assertArrayHasKey('City Centre and Salford', $map);
-        $this->assertNull($map['City Centre and Salford']);
+        $this->assertSame('citycentre@tenantsunion.org.uk', $map['City Centre and Salford']);
     }
 
     // Bury, added by GMTU's revised sheet.
