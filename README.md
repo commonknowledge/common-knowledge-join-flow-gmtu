@@ -39,14 +39,14 @@ The map does double duty: `PostcodeValidation.php` treats "is this outcode a key
 
 GMTU split the old "South and Central" branch into **City Centre and Salford** and **South Manchester** (JOIN-151). `M1`, `M2` and `M3` moved off South Manchester, and `M17`, `M27`, `M28`, `M30` and `M38` gained a branch having previously had none.
 
-Four rows in the sheet look like leftovers from before the split and are deliberately left as the sheet has them, pending confirmation from GMTU. Each is pinned by a test in `tests/BranchTest.php` so the decision is visible in the suite rather than buried here:
+A revised sheet then moved `M5`, `M6`, `M7`, `M44` and `M50` onto City Centre and Salford as well, gave the branch its own address (`citycentre@tenantsunion.org.uk`), added a **Bury** branch covering `M25`, `M26` and `M45`, and gave Rochdale `OL10` and `OL15`.
+
+Two rows still look like leftovers from before the split. They are deliberately left as the sheet has them, pending confirmation from GMTU, and each is pinned by a test in `tests/BranchTest.php` so the decision is visible in the suite rather than buried here:
 
 | Outcode | Areas | Sheet says | Why it looks wrong |
 |---|---|---|---|
-| `M4` | Arndale, Ancoats, Northern Quarter, Shudehill | South Manchester | City centre, sits alongside M1 to M3 |
-| `M5`, `M6`, `M7` | Ordsall, Weaste, Pendleton, Broughton, Kersal | No branch | Core Salford |
-| `M50` | Salford Quays, MediaCityUK | South Manchester | Salford |
-| `M44` | Irlam, Cadishead | No branch | Salford |
+| `M4` | Arndale, Ancoats, Northern Quarter, Shudehill | South Manchester | City centre, sits alongside M1 to M3, which all moved |
+| `BL8`, `BL9` | Bury centre, Tottington, Ramsbottom | No branch | Bury town itself, now that a Bury branch exists |
 
 ### Branch names must match the CRM exactly
 
