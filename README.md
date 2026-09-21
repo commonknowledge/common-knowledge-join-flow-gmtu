@@ -27,35 +27,6 @@ The parent plugin fires hooks at each stage of member registration and membershi
 | 8 | `ck_join_flow_should_lapse_member` (filter) | `LapsingOverride.php` | Override lapse decision using GMTU standing rules (see below) |
 | 9 | `ck_join_flow_should_unlapse_member` (filter) | `LapsingOverride.php` | Override unlapse decision using GMTU standing rules (see below) |
 
-## Branch mapping
-
-### Where the mapping comes from
-
-`get_branch_map()` in `src/Branch.php` is the single source of truth for which postcode outcode belongs to which branch. It is transcribed from GMTU's own "Branch postcode breakdown" spreadsheets (the `postcodes mcr` and `additional postcodes` tabs), not from any postcode dataset. When GMTU reorganise branches, the sheets change first and this map follows.
-
-The map does double duty: `PostcodeValidation.php` treats "is this outcode a key in the map" as "is this postcode in our coverage area". An outcode mapped to `null` is in area but has no branch yet. An outcode absent from the map altogether is rejected as out of area, so removing a key blocks people from joining.
-
-### City Centre and Salford
-
-GMTU split the old "South and Central" branch into **City Centre and Salford** and **South Manchester** (JOIN-151). `M1`, `M2` and `M3` moved off South Manchester, and `M17`, `M27`, `M28`, `M30` and `M38` gained a branch having previously had none.
-
-A revised sheet then moved `M5`, `M6`, `M7`, `M44` and `M50` onto City Centre and Salford as well, gave the branch its own address (`citycentre@tenantsunion.org.uk`), added a **Bury** branch covering `M25`, `M26` and `M45`, and gave Rochdale `OL10` and `OL15`.
-
-Three rows in the sheet were left over from before the split, and GMTU have since confirmed all three. The map follows the confirmations rather than the sheet, and `tests/BranchTest.php` pins each one:
-
-| Outcode | Areas | Sheet said | Confirmed as |
-|---|---|---|---|
-| `M4` | Arndale, Ancoats, Northern Quarter, Shudehill | South Manchester | City Centre and Salford, alongside M1 to M3 |
-| `BL8`, `BL9` | Bury centre, Tottington, Ramsbottom, Summerseat | No branch | Bury, which is Bury town itself |
-
-The South Manchester notification address is the third. The sheet spells it `southmcr@tenantsunion.org.uk`; GMTU confirmed the live address is `south.mcr@tenantsunion.org.uk`, with the dot, so the map keeps that.
-
-Where the sheet and this map disagree, the map is right and the sheet is stale. Worth remembering next time the sheets are re-imported, because a careless transcription would undo all three.
-
-### Branch names must match the CRM exactly
-
-`ZetkinService::findOrCreateTag` in the parent plugin creates a Zetkin tag from whatever string it is given. A typo in a branch name does not fail, it silently creates a second, near-identical tag and starts filling it with members. The strings in `get_branch_map()` are the tag titles, so treat them as data that has to match Zetkin, not as labels.
-
 ## Branch tagging
 
 ### Why this exists
@@ -173,7 +144,7 @@ The main configuration is in `join-gmtu.php` and includes:
 - Admin notification email addresses
 - Notification subject and message templates
 
-Branch-to-postcode mappings and branch email addresses are in `src/Branch.php`. See [Branch mapping](#branch-mapping) for where those mappings come from and why an absent outcode is not the same as a `null` one.
+Branch-to-postcode mappings and branch email addresses are in `src/Branch.php`.
 
 ## Local Development
 
