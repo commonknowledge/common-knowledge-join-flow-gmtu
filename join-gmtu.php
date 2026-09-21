@@ -155,6 +155,7 @@ if (defined('WP_CLI') && WP_CLI) {
                 'status' => $action['status'],
                 'add' => $action['addTag'] ?? '',
                 'remove' => implode(', ', $action['removeTags']),
+                'mailchimp' => $action['mailchimp'] ?? '',
                 'reason' => $action['reason'],
             ];
         }
@@ -175,7 +176,7 @@ if (defined('WP_CLI') && WP_CLI) {
         \WP_CLI\Utils\format_items(
             'table',
             $rows,
-            ['email', 'postcode', 'outcode', 'status', 'add', 'remove', 'reason']
+            ['email', 'postcode', 'outcode', 'status', 'add', 'remove', 'mailchimp', 'reason']
         );
 
         $counts = $result['counts'];
@@ -189,6 +190,32 @@ if (defined('WP_CLI') && WP_CLI) {
 
         if ($counts['failed'] > 0) {
             \WP_CLI::warning("Failed part way through: {$counts['failed']}. See the log for details.");
+        }
+
+        // GMTU use Mailchimp alongside Zetkin, so a run that only fixed Zetkin
+        // has only done half the job. Say which it was, either way.
+        if (!$result['mailchimpEnabled']) {
+            \WP_CLI::warning(
+                'Mailchimp is not configured, so only Zetkin was checked. '
+                . 'Branch tags in Mailchimp will still be out of date.'
+            );
+        } else {
+            \WP_CLI::log('');
+            \WP_CLI::log("Also updated in Mailchimp: {$counts['mailchimpUpdated']}");
+
+            if ($counts['mailchimpNotFound'] > 0) {
+                \WP_CLI::warning(
+                    "Not in the Mailchimp audience: {$counts['mailchimpNotFound']}. "
+                    . 'These were updated in Zetkin only.'
+                );
+            }
+
+            if ($counts['mailchimpFailed'] > 0) {
+                \WP_CLI::warning(
+                    "Mailchimp update failed: {$counts['mailchimpFailed']}. "
+                    . 'Zetkin was updated for these members. See the log for details.'
+                );
+            }
         }
 
         if ($apply) {
