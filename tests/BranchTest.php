@@ -254,4 +254,40 @@ class BranchTest extends TestCase
         $this->assertArrayHasKey('City Centre and Salford', $map);
         $this->assertNull($map['City Centre and Salford']);
     }
+
+    // Bury, added by GMTU's revised sheet.
+
+    /**
+     * @dataProvider buryOutcodeProvider
+     */
+    public function test_outcode_resolves_to_bury($outcode)
+    {
+        $this->assertSame('Bury', get_branch_for_outcode($outcode));
+    }
+
+    public function buryOutcodeProvider()
+    {
+        return [
+            'M25 Prestwich, Sedgley Park, Simister' => ['M25'],
+            'M26 Radcliffe, Stoneclough' => ['M26'],
+            'M45 Whitefield, Besses o\' th\' Barn' => ['M45'],
+        ];
+    }
+
+    public function test_branch_email_map_bury_has_null_email()
+    {
+        $map = get_branch_email_map();
+        $this->assertArrayHasKey('Bury', $map);
+        $this->assertNull($map['Bury']);
+    }
+
+    /**
+     * BL8 and BL9 are Bury town itself, but the sheet still leaves them
+     * unassigned even though it now gives Bury a branch. Raised on JOIN-151.
+     */
+    public function test_bury_town_outcodes_follow_the_sheet_and_stay_unassigned()
+    {
+        $this->assertNull(get_branch_for_outcode('BL8'));
+        $this->assertNull(get_branch_for_outcode('BL9'));
+    }
 }
