@@ -143,8 +143,8 @@ function require_parent_plugin_helpers() {
         ],
         MailchimpService::class => [
             'isConfigured',
-            'addTagToMember',
-            'removeTagFromMember',
+            'tryAddTag',
+            'tryRemoveTag',
         ],
     ];
 
@@ -223,8 +223,8 @@ function run_branch_retag(
         method_exists(MailchimpService::class, 'isConfigured') && MailchimpService::isConfigured()
     );
 
-    $mc_add_tag    = $mc_tag_adder   ?? fn($email, $tag) => MailchimpService::addTagToMember($email, $tag);
-    $mc_remove_tag = $mc_tag_remover ?? fn($email, $tag) => MailchimpService::removeTagFromMember($email, $tag);
+    $mc_add_tag    = $mc_tag_adder   ?? fn($email, $tag) => MailchimpService::tryAddTag($email, $tag);
+    $mc_remove_tag = $mc_tag_remover ?? fn($email, $tag) => MailchimpService::tryRemoveTag($email, $tag);
 
     $perPage = 100;
     $people = [];
