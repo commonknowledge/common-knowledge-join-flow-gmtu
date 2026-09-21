@@ -62,8 +62,8 @@ class BranchTest extends TestCase
     public function test_get_branch_map_contains_null_for_unassigned_outcodes()
     {
         $map = get_branch_map();
-        $this->assertArrayHasKey('M5', $map);
-        $this->assertNull($map['M5']);
+        $this->assertArrayHasKey('M29', $map);
+        $this->assertNull($map['M29']);
     }
 
     public function test_get_branch_email_map_returns_array()
@@ -177,9 +177,9 @@ class BranchTest extends TestCase
         $this->assertNull($map['Wigan']);
     }
 
-    public function test_outcode_m5_resolves_to_null_unassigned()
+    public function test_outcode_m29_resolves_to_null_unassigned()
     {
-        $this->assertNull(get_branch_for_outcode('M5'));
+        $this->assertNull(get_branch_for_outcode('M29'));
     }
 
     public function test_unknown_outcode_resolves_to_null()
@@ -209,6 +209,11 @@ class BranchTest extends TestCase
             'M28 Worsley, Walkden, Boothstown' => ['M28'],
             'M30 Eccles, Monton, Peel Green, Winton' => ['M30'],
             'M38 Little Hulton' => ['M38'],
+            'M5 Ordsall, Seedley, Weaste, University' => ['M5'],
+            'M6 Pendleton, Langworthy, Charlestown' => ['M6'],
+            'M7 Higher and Lower Broughton, Kersal' => ['M7'],
+            'M44 Irlam, Cadishead' => ['M44'],
+            'M50 Salford Quays, MediaCityUK' => ['M50'],
         ];
     }
 
@@ -229,29 +234,18 @@ class BranchTest extends TestCase
             'M21 Chorlton-cum-Hardy' => ['M21'],
             'M22 Wythenshawe, Northenden' => ['M22'],
             'M23 Baguley, Brooklands' => ['M23'],
-            'M50 Salford Quays, MediaCityUK' => ['M50'],
         ];
     }
 
     /**
      * M4 (Arndale, Ancoats, Northern Quarter) is city centre but GMTU's sheet
-     * still has it on South Manchester. We follow the sheet rather than guess.
-     * Raised with GMTU on JOIN-151; flip this test when they confirm.
+     * still has it on South Manchester, in the revised sheet as well as the first.
+     * We follow the sheet rather than guess. Raised with GMTU twice on JOIN-151;
+     * flip this test when they confirm.
      */
     public function test_outcode_m4_follows_the_sheet_and_stays_on_south_manchester()
     {
         $this->assertSame('South Manchester', get_branch_for_outcode('M4'));
-    }
-
-    /**
-     * Likewise M5, M6, M7 and M44 are Salford but the sheet leaves them unassigned.
-     */
-    public function test_salford_outcodes_the_sheet_leaves_unassigned_resolve_to_null()
-    {
-        $this->assertNull(get_branch_for_outcode('M5'));
-        $this->assertNull(get_branch_for_outcode('M6'));
-        $this->assertNull(get_branch_for_outcode('M7'));
-        $this->assertNull(get_branch_for_outcode('M44'));
     }
 
     public function test_branch_email_map_city_centre_and_salford_has_null_email()

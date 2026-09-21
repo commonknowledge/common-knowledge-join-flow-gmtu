@@ -100,9 +100,9 @@ class BranchAssignmentTest extends TestCase
     {
         $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
-        Functions\when('get_transient')->justReturn('M5');
+        Functions\when('get_transient')->justReturn('M29');
 
-        $data = ['addressPostcode' => 'M5 3AA'];
+        $data = ['addressPostcode' => 'M29 7AA'];
         $result = $handler($data);
         $this->assertNull($result['branch']);
     }
