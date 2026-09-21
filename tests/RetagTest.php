@@ -318,14 +318,27 @@ class RetagTest extends TestCase
 
     /**
      * The command depends on Zetkin helpers added to the parent plugin in
-     * 1.4.38. Against an older parent it must say so, not fatal halfway
-     * through a run. ZetkinService does not exist in the test suite, so the
-     * default wiring stands in for an out-of-date parent.
+     * 1.4.38 and Mailchimp ones added in 1.4.39. Against an older parent it
+     * must say so, not fatal halfway through a run. Neither service exists in
+     * the test suite, so the default wiring stands in for an out-of-date
+     * parent.
      */
-    public function test_refuses_to_run_against_a_parent_plugin_without_the_zetkin_helpers()
+    public function test_refuses_to_run_against_a_parent_plugin_without_the_bulk_helpers()
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/1\.4\.38/');
+        $this->expectExceptionMessageMatches('/1\.4\.39/');
+
+        run_branch_retag();
+    }
+
+    /**
+     * The Mailchimp helpers are as much a requirement as the Zetkin ones, so
+     * a parent that has one set but not the other must still be refused.
+     */
+    public function test_refuses_to_run_against_a_parent_plugin_without_the_mailchimp_helpers()
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/MailchimpService|ZetkinService/');
 
         run_branch_retag();
     }
@@ -385,5 +398,203 @@ class RetagTest extends TestCase
         $this->assertSame(1, $result['counts']['add']);
         $this->assertSame(1, $result['counts']['unchanged']);
         $this->assertSame(1, $result['counts']['skipped']);
+    }
+
+    // Mailchimp. GMTU use it alongside Zetkin, so a branch tag that is only
+    // fixed in Zetkin is only half fixed. Zetkin stays the system of record:
+    // it holds the postcode the plan is built from, and Mailchimp is matched
+    // on email afterwards.
+
+    /**
+     * Fake Mailchimp transport. $outcomes maps an email to the status the
+     * helpers should report; anything unlisted succeeds.
+     */
+    private function fakeMailchimp(array $outcomes = [])
+    {
+        $calls = new \stdClass();
+        $calls->added = [];
+        $calls->removed = [];
+        $calls->order = [];
+
+        $adder = function ($email, $tag) use ($outcomes, $calls) {
+            $calls->added[] = [$email, $tag];
+            $calls->order[] = "add:$tag";
+            return $outcomes[$email] ?? 'ok';
+        };
+        $remover = function ($email, $tag) use ($outcomes, $calls) {
+            $calls->removed[] = [$email, $tag];
+            $calls->order[] = "remove:$tag";
+            return $outcomes[$email] ?? 'ok';
+        };
+
+        return [$adder, $remover, $calls];
+    }
+
+    public function test_apply_also_retags_in_mailchimp()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame([['a@example.com', 'City Centre and Salford']], $mc->added);
+        $this->assertSame([['a@example.com', 'South Manchester']], $mc->removed);
+        $this->assertSame('ok', $result['actions'][0]['mailchimp']);
+    }
+
+    /**
+     * Same discipline as Zetkin: the new tag goes on before the old one comes
+     * off, so an interruption leaves a member over-tagged rather than adrift.
+     */
+    public function test_mailchimp_gains_the_new_tag_before_losing_the_old_one()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
+
+        run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame(['add:City Centre and Salford', 'remove:South Manchester'], $mc->order);
+    }
+
+    public function test_dry_run_writes_nothing_to_mailchimp()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
+
+        run_branch_retag(false, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame([], $mc->added);
+        $this->assertSame([], $mc->removed);
+    }
+
+    public function test_members_already_on_the_right_branch_are_not_touched_in_mailchimp()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M20 2AA', 'tags' => ['South Manchester']],
+        ]);
+        [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
+
+        run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame([], $mc->added);
+        $this->assertSame([], $mc->removed);
+    }
+
+    /**
+     * Someone in Zetkin but not in the Mailchimp audience is the known blind
+     * spot of planning from Zetkin. It must be counted and visible, not
+     * silently treated as done.
+     */
+    public function test_member_missing_from_mailchimp_is_reported_not_failed()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'ghost@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        [$mcAdd, $mcRemove] = $this->fakeMailchimp(['ghost@example.com' => 'not_found']);
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame('not_found', $result['actions'][0]['mailchimp']);
+        $this->assertSame(1, $result['counts']['mailchimpNotFound']);
+        $this->assertSame(0, $result['counts']['failed']);
+        $this->assertSame(1, $result['counts']['move']);
+    }
+
+    /**
+     * A Mailchimp outage must not be recorded as a Zetkin failure. Zetkin is
+     * the system of record and its write succeeded.
+     */
+    public function test_mailchimp_failure_is_counted_separately_from_the_zetkin_result()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover, $calls] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        [$mcAdd, $mcRemove] = $this->fakeMailchimp(['a@example.com' => 'error']);
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame('error', $result['actions'][0]['mailchimp']);
+        $this->assertSame(1, $result['counts']['mailchimpFailed']);
+        $this->assertSame(0, $result['counts']['failed']);
+        $this->assertNotSame([], $calls->added);
+    }
+
+    /**
+     * If the Zetkin write failed, do not push the change to Mailchimp. That
+     * would drive the two systems further apart rather than together.
+     */
+    public function test_mailchimp_is_left_alone_when_the_zetkin_write_failed()
+    {
+        [$lister, $tagsGetter, $resolver, , $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        $failingAdder = fn($personId, $tagId) => false;
+        [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
+
+        $result = run_branch_retag(
+            true,
+            null,
+            $lister,
+            $tagsGetter,
+            $resolver,
+            $failingAdder,
+            $remover,
+            $mcAdd,
+            $mcRemove
+        );
+
+        $this->assertSame([], $mc->added);
+        $this->assertSame([], $mc->removed);
+        $this->assertSame(1, $result['counts']['failed']);
+    }
+
+    public function test_mailchimp_updates_are_counted()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+            ['id' => 2, 'email' => 'b@example.com', 'zip_code' => 'M25 1AA', 'tags' => []],
+            ['id' => 3, 'email' => 'c@example.com', 'zip_code' => 'M20 2AA', 'tags' => ['South Manchester']],
+        ]);
+        [$mcAdd, $mcRemove] = $this->fakeMailchimp();
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame(2, $result['counts']['mailchimpUpdated']);
+        $this->assertSame(0, $result['counts']['mailchimpNotFound']);
+        $this->assertSame(0, $result['counts']['mailchimpFailed']);
+    }
+
+    /**
+     * With Mailchimp switched off, the run still does its Zetkin job and says
+     * plainly that Mailchimp was not touched, rather than implying it is done.
+     */
+    public function test_mailchimp_is_reported_as_disabled_when_not_configured()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover);
+
+        $this->assertSame('disabled', $result['actions'][0]['mailchimp']);
+        $this->assertFalse($result['mailchimpEnabled']);
+    }
+
+    public function test_mailchimp_is_reported_as_enabled_when_wired_up()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        [$mcAdd, $mcRemove] = $this->fakeMailchimp();
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertTrue($result['mailchimpEnabled']);
     }
 }

@@ -16,6 +16,7 @@
 
 namespace CommonKnowledge\JoinBlock\Organisation\GMTU;
 
+use CommonKnowledge\JoinBlock\Services\MailchimpService;
 use CommonKnowledge\JoinBlock\Services\ZetkinService;
 
 /**
@@ -121,30 +122,42 @@ function plan_branch_retag(array $people, array $branchMap): array {
 /**
  * Check the parent plugin is new enough to do a bulk re-tag.
  *
- * The helpers this needs landed in Common Knowledge Join Flow 1.4.38. Against
- * an older parent the run would fatal partway through, which on a write run
- * could leave members half re-tagged, so refuse before touching anything.
+ * The Zetkin helpers landed in Common Knowledge Join Flow 1.4.38 and the
+ * Mailchimp ones in 1.4.39. Against an older parent the run would fatal
+ * partway through, which on a write run could leave members half re-tagged,
+ * so refuse before touching anything.
  *
  * @since 1.5.12
  *
  * @throws \RuntimeException If the parent plugin is missing or out of date.
  * @return void
  */
-function require_zetkin_bulk_helpers() {
+function require_parent_plugin_helpers() {
     $required = [
-        'listPeople',
-        'getPersonTags',
-        'findOrCreateTagByTitle',
-        'addTagToPerson',
-        'removeTagFromPerson',
+        ZetkinService::class => [
+            'listPeople',
+            'getPersonTags',
+            'findOrCreateTagByTitle',
+            'addTagToPerson',
+            'removeTagFromPerson',
+        ],
+        MailchimpService::class => [
+            'isConfigured',
+            'addTagToMember',
+            'removeTagFromMember',
+        ],
     ];
 
-    foreach ($required as $method) {
-        if (!method_exists(ZetkinService::class, $method)) {
-            throw new \RuntimeException(
-                "ZetkinService::$method() is not available. Branch re-tagging needs "
-                . "Common Knowledge Join Flow 1.4.38 or newer. Update the parent plugin and try again."
-            );
+    foreach ($required as $class => $methods) {
+        $shortName = substr((string) strrchr($class, '\\'), 1);
+
+        foreach ($methods as $method) {
+            if (!method_exists($class, $method)) {
+                throw new \RuntimeException(
+                    "$shortName::$method() is not available. Branch re-tagging needs "
+                    . "Common Knowledge Join Flow 1.4.39 or newer. Update the parent plugin and try again."
+                );
+            }
         }
     }
 }
@@ -166,7 +179,9 @@ function require_zetkin_bulk_helpers() {
  * @param callable|null $tag_resolver  fn(string $title): ?array tag record
  * @param callable|null $tag_adder     fn($personId, $tagId): bool
  * @param callable|null $tag_remover   fn($personId, $tagId): bool
- * @return array{actions: array, counts: array, applied: bool}
+ * @param callable|null $mc_tag_adder   fn(string $email, string $tag): string
+ * @param callable|null $mc_tag_remover fn(string $email, string $tag): string
+ * @return array{actions: array, counts: array, applied: bool, mailchimpEnabled: bool}
  */
 function run_branch_retag(
     bool $apply = false,
@@ -175,7 +190,9 @@ function run_branch_retag(
     ?callable $tags_getter = null,
     ?callable $tag_resolver = null,
     ?callable $tag_adder = null,
-    ?callable $tag_remover = null
+    ?callable $tag_remover = null,
+    ?callable $mc_tag_adder = null,
+    ?callable $mc_tag_remover = null
 ): array {
     $usingParentPlugin = $people_lister === null
         || $tags_getter === null
@@ -184,7 +201,7 @@ function run_branch_retag(
         || $tag_remover === null;
 
     if ($usingParentPlugin) {
-        require_zetkin_bulk_helpers();
+        require_parent_plugin_helpers();
     }
 
     $list_people = $people_lister ?? fn($page, $perPage) => ZetkinService::listPeople($page, $perPage);
@@ -192,6 +209,22 @@ function run_branch_retag(
     $resolve_tag = $tag_resolver  ?? fn($title) => ZetkinService::findOrCreateTagByTitle($title);
     $add_tag     = $tag_adder     ?? fn($personId, $tagId) => ZetkinService::addTagToPerson($personId, $tagId);
     $remove_tag  = $tag_remover   ?? fn($personId, $tagId) => ZetkinService::removeTagFromPerson($personId, $tagId);
+
+    // Zetkin is the system of record: it holds the postcode the plan is built
+    // from. Mailchimp cannot be planned from, because a member's postcode only
+    // reaches it inside the ADDRESS merge field, which is skipped entirely on
+    // update flows and when no street address was collected. So the plan comes
+    // from Zetkin and Mailchimp is matched on email afterwards. The blind spot
+    // is anyone in Mailchimp but not Zetkin; they are never reached, which is
+    // why the run reports its Mailchimp outcomes separately rather than
+    // folding them into the totals.
+    $mailchimpInjected = $mc_tag_adder !== null && $mc_tag_remover !== null;
+    $mailchimpEnabled = $mailchimpInjected || (
+        method_exists(MailchimpService::class, 'isConfigured') && MailchimpService::isConfigured()
+    );
+
+    $mc_add_tag    = $mc_tag_adder   ?? fn($email, $tag) => MailchimpService::addTagToMember($email, $tag);
+    $mc_remove_tag = $mc_tag_remover ?? fn($email, $tag) => MailchimpService::removeTagFromMember($email, $tag);
 
     $perPage = 100;
     $people = [];
@@ -255,6 +288,9 @@ function run_branch_retag(
         'review' => 0,
         'skipped' => 0,
         'failed' => 0,
+        'mailchimpUpdated' => 0,
+        'mailchimpNotFound' => 0,
+        'mailchimpFailed' => 0,
     ];
 
     // Resolving a tag title costs a round trip, and a run moves many members
@@ -270,6 +306,7 @@ function run_branch_retag(
 
     foreach ($actions as $index => $action) {
         $counts[$action['status']]++;
+        $actions[$index]['mailchimp'] = $mailchimpEnabled ? 'skipped' : 'disabled';
 
         if (!$apply) {
             continue;
@@ -310,6 +347,43 @@ function run_branch_retag(
             $actions[$index]['status'] = 'failed';
             $counts[$action['status']]--;
             $counts['failed']++;
+            continue;
+        }
+
+        if (!$mailchimpEnabled) {
+            continue;
+        }
+
+        // Only once Zetkin is settled. Pushing a change to Mailchimp after a
+        // failed Zetkin write would drive the two further apart, not together.
+        $mailchimpResult = 'ok';
+
+        if ($action['addTag'] !== null) {
+            $mailchimpResult = $mc_add_tag($action['email'], $action['addTag']);
+        }
+
+        // Add before remove here too, so an interruption leaves a member
+        // over-tagged in Mailchimp rather than with no branch at all.
+        if ($mailchimpResult === 'ok') {
+            foreach ($action['removeTags'] as $title) {
+                $status = $mc_remove_tag($action['email'], $title);
+                if ($status !== 'ok') {
+                    $mailchimpResult = $status;
+                    break;
+                }
+            }
+        }
+
+        $actions[$index]['mailchimp'] = $mailchimpResult;
+
+        if ($mailchimpResult === 'ok') {
+            $counts['mailchimpUpdated']++;
+        } elseif ($mailchimpResult === 'not_found') {
+            $counts['mailchimpNotFound']++;
+            log_info("{$action['email']} is not in the Mailchimp audience, so only Zetkin was updated");
+        } else {
+            $counts['mailchimpFailed']++;
+            log_warning("Could not update Mailchimp tags for {$action['email']}");
         }
     }
 
@@ -317,5 +391,6 @@ function run_branch_retag(
         'actions' => $actions,
         'counts' => $counts,
         'applied' => $apply,
+        'mailchimpEnabled' => $mailchimpEnabled,
     ];
 }
