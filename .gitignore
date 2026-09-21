@@ -1,3 +1,6 @@
 vendor/
 coverage/
 .phpunit.result.cache
+
+# Working notes, not repo content
+JOIN-151-SHIP-PLAN.md

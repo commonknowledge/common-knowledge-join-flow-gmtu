@@ -11,6 +11,8 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 // Stub the parent plugin's Settings class so StripePaymentHistory can call
 // Settings::get() without the full WordPress/CarbonFields stack.
 require_once __DIR__ . '/stubs/Settings.php';
+require_once __DIR__ . '/stubs/MailchimpService.php';
+require_once __DIR__ . '/stubs/ZetkinService.php';
 
 // Define WordPress constants the plugin expects
 if (!defined('ABSPATH')) {
@@ -37,3 +39,4 @@ require_once dirname(__DIR__) . '/src/MembershipStanding.php';
 require_once dirname(__DIR__) . '/src/LapsedStore.php';
 require_once dirname(__DIR__) . '/src/StripePaymentHistory.php';
 require_once dirname(__DIR__) . '/src/LapsingOverride.php';
+require_once dirname(__DIR__) . '/src/Retag.php';
