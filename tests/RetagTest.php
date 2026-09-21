@@ -353,7 +353,7 @@ class RetagTest extends TestCase
         $required = parent_plugin_required_helpers();
 
         $this->assertSame(
-            ['listPeople', 'getPersonTags', 'findOrCreateTagByTitle', 'addTagToPerson', 'removeTagFromPerson'],
+            ['listPeople', 'getPersonTags', 'findOrCreateTagByTitle', 'tryAddTagToPerson', 'tryRemoveTagFromPerson'],
             $required['CommonKnowledge\\JoinBlock\\Services\\ZetkinService']
         );
     }

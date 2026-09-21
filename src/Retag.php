@@ -138,8 +138,8 @@ function parent_plugin_required_helpers() {
             'listPeople',
             'getPersonTags',
             'findOrCreateTagByTitle',
-            'addTagToPerson',
-            'removeTagFromPerson',
+            'tryAddTagToPerson',
+            'tryRemoveTagFromPerson',
         ],
         MailchimpService::class => [
             'isConfigured',
@@ -209,8 +209,8 @@ function run_branch_retag(
     $list_people = $people_lister ?? fn($page, $perPage) => ZetkinService::listPeople($page, $perPage);
     $get_tags    = $tags_getter   ?? fn($personId) => ZetkinService::getPersonTags($personId);
     $resolve_tag = $tag_resolver  ?? fn($title) => ZetkinService::findOrCreateTagByTitle($title);
-    $add_tag     = $tag_adder     ?? fn($personId, $tagId) => ZetkinService::addTagToPerson($personId, $tagId);
-    $remove_tag  = $tag_remover   ?? fn($personId, $tagId) => ZetkinService::removeTagFromPerson($personId, $tagId);
+    $add_tag     = $tag_adder     ?? fn($personId, $tagId) => ZetkinService::tryAddTagToPerson($personId, $tagId);
+    $remove_tag  = $tag_remover   ?? fn($personId, $tagId) => ZetkinService::tryRemoveTagFromPerson($personId, $tagId);
 
     // Zetkin is the system of record: it holds the postcode the plan is built
     // from. Mailchimp cannot be planned from, because a member's postcode only
