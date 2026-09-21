@@ -76,7 +76,7 @@ class BranchTest extends TestCase
     public function test_get_branch_email_map_maps_south_manchester()
     {
         $map = get_branch_email_map();
-        $this->assertSame('south.mcr@tenantsunion.org.uk', $map['South Manchester']);
+        $this->assertSame('southmcr@tenantsunion.org.uk', $map['South Manchester']);
     }
 
     public function test_get_branch_email_map_maps_hulme()
