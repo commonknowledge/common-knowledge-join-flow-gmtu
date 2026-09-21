@@ -129,6 +129,16 @@ class BranchTest extends TestCase
         $this->assertSame('Rochdale', get_branch_for_outcode('OL11'));
     }
 
+    public function test_outcode_ol10_resolves_to_rochdale()
+    {
+        $this->assertSame('Rochdale', get_branch_for_outcode('OL10'));
+    }
+
+    public function test_outcode_ol15_resolves_to_rochdale()
+    {
+        $this->assertSame('Rochdale', get_branch_for_outcode('OL15'));
+    }
+
     public function test_outcode_sk1_resolves_to_stockport()
     {
         $this->assertSame('Stockport', get_branch_for_outcode('SK1'));
