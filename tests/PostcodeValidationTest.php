@@ -121,11 +121,11 @@ class PostcodeValidationTest extends TestCase
         $callbacks = $this->registerValidationAndCaptureHandlers();
         $validator = $callbacks['ck_join_flow_postcode_validation:10'];
 
-        // BL8 is in the branch map but maps to null (no branch)
-        Functions\when('get_transient')->justReturn('BL8');
+        // WA13 is in the branch map but maps to null (no branch)
+        Functions\when('get_transient')->justReturn('WA13');
 
         $response = ['status' => 'ok'];
-        $result = $validator($response, 'BL8 1AA', [], null);
+        $result = $validator($response, 'WA13 0AA', [], null);
         $this->assertSame($response, $result);
     }
 

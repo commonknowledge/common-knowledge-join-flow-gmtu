@@ -65,13 +65,44 @@ class BranchAssignmentTest extends TestCase
         $this->assertSame('Moss Side', $result['branch']);
     }
 
+    /**
+     * End to end through the filter for the branch this ticket created: a city
+     * centre postcode must come out as City Centre and Salford, not South
+     * Manchester. See JOIN-151.
+     */
+    public function test_assigns_city_centre_and_salford_for_a_city_centre_postcode()
+    {
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
+
+        Functions\when('get_transient')->justReturn('M1');
+
+        $data = ['addressPostcode' => 'M1 1AA'];
+        $result = $handler($data);
+        $this->assertSame('City Centre and Salford', $result['branch']);
+    }
+
+    /**
+     * Swinton had no branch at all before JOIN-151, so these members were
+     * arriving in the CRM untagged.
+     */
+    public function test_assigns_city_centre_and_salford_for_a_salford_postcode()
+    {
+        $handler = $this->registerBranchAssignmentAndCaptureHandler();
+
+        Functions\when('get_transient')->justReturn('M27');
+
+        $data = ['addressPostcode' => 'M27 4AA'];
+        $result = $handler($data);
+        $this->assertSame('City Centre and Salford', $result['branch']);
+    }
+
     public function test_sets_null_branch_for_null_mapping()
     {
         $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
-        Functions\when('get_transient')->justReturn('M5');
+        Functions\when('get_transient')->justReturn('M29');
 
-        $data = ['addressPostcode' => 'M5 3AA'];
+        $data = ['addressPostcode' => 'M29 7AA'];
         $result = $handler($data);
         $this->assertNull($result['branch']);
     }
@@ -80,10 +111,10 @@ class BranchAssignmentTest extends TestCase
     {
         $handler = $this->registerBranchAssignmentAndCaptureHandler();
 
-        // BL8 is in the branch map but deliberately has no branch
-        Functions\when('get_transient')->justReturn('BL8');
+        // WA13 is in the branch map but deliberately has no branch
+        Functions\when('get_transient')->justReturn('WA13');
 
-        $data = ['addressPostcode' => 'BL8 1AA'];
+        $data = ['addressPostcode' => 'WA13 0AA'];
         $result = $handler($data);
         $this->assertNull($result['branch']);
     }

@@ -5,7 +5,7 @@ This add-on to the main [Join Flow plugin](https://github.com/commonknowledge/jo
 ## Features
 
 - **Postcode validation** — Validates that postcodes are within the Greater Manchester coverage area and blocks out-of-area submissions with helpful error messages.
-- **Branch assignment** — Automatically assigns members to a branch (e.g. South Manchester, Harpurhey, Stockport) based on their postcode outcode.
+- **Branch assignment** — Automatically assigns members to a branch (e.g. City Centre and Salford, South Manchester, Harpurhey, Stockport) based on their postcode outcode.
 - **Branch tagging** — Adds the assigned branch name as a tag when members are synced to external services (Mailchimp, Zetkin, etc.).
 - **Email notifications** — Sends admin and branch-specific notification emails when a new member registers.
 - **Postcode lookup caching** — Caches postcodes.io API responses as WordPress transients (7-day TTL) to reduce external API calls.
@@ -19,7 +19,7 @@ The parent plugin fires hooks at each stage of member registration and membershi
 |---|------|------|------------|
 | 1 | `ck_join_flow_postcode_validation` (filter) | `PostcodeValidation.php` | Check outcode against branch map; return error if out of area |
 | 2 | `ck_join_flow_step_response` (filter) | `PostcodeValidation.php` | Second-line validation on form step submission |
-| 3 | `ck_join_flow_pre_handle_join` (filter) | `BranchAssignment.php` | Look up postcode outcode, find branch, inject into `$data["branch"]`, `$data["customFields"]["branch"]`, and `$data["customFieldsConfig"]` |
+| 3 | `ck_join_flow_pre_handle_join` (filter) | `BranchAssignment.php` | Look up postcode outcode, find branch, inject into `$data["branch"]` only, never `customFields` |
 | 4 | `ck_join_flow_add_tags` (filter) | `Tagging.php` | Append branch name to tags sent to external services |
 | 5 | `ck_join_flow_success` (action, priority 5) | `LapsingOverride.php` | Clear sticky-lapsed flag when a member explicitly rejoins |
 | 6 | `ck_join_flow_success` (action, priority 10) | `Notifications.php` | Send admin notification email |
