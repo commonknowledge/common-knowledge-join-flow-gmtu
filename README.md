@@ -10,6 +10,7 @@ This add-on to the main [Join Flow plugin](https://github.com/commonknowledge/jo
 - **Email notifications** — Sends admin and branch-specific notification emails when a new member registers.
 - **Postcode lookup caching** — Caches postcodes.io API responses as WordPress transients (7-day TTL) to reduce external API calls.
 - **Membership lapsing override** — Applies GMTU's own standing rules instead of lapsing members immediately on Stripe payment failure.
+- **Income guidance** — Switches on the parent plugin's table of suggested dues against income on the membership step.
 
 ## Hook lifecycle
 
@@ -116,6 +117,18 @@ Suppose today is 15 August. The last completed month is July.
 
 The lapsed flag is stored in WordPress `wp_options`, keyed by `gmtu_lapsed_` followed by the SHA-256 hash of the member's lowercased email address. The stored value is a JSON object recording the email, timestamp, and webhook trigger, for audit purposes. The flag is cleared automatically when the member completes a new join form submission.
 
+## Income guidance
+
+Switches on the parent plugin's income guidance (`ck_join_flow_income_guidance_enabled`), which needs Common Knowledge Join Flow 1.4.44 or newer. On an older parent nothing happens.
+
+The content is set in WordPress, not here:
+
+- **Bands:** each membership plan under Join > Membership Plans (or a CK Join Form block's own plans) gets **Weekly income** and **Monthly income** fields, e.g. "£600 to £800". A plan with neither filled in is left out of the table.
+- **Heading:** Join > Copy > **Income guidance heading**, shown above the table.
+- **Note:** Join > Copy > **Income guidance note**, shown below the table, e.g. a line for people who can't afford dues.
+
+On the membership step, choosing a row in the table selects that tier.
+
 ## Structure
 
 ```
@@ -129,6 +142,7 @@ src/
   PostcodeValidation.php   # Validates postcodes are within GM coverage area
   BranchAssignment.php     # Assigns branch to member data based on postcode
   Tagging.php              # Adds branch as tag in external services
+  IncomeGuidance.php       # Switches on the parent plugin's income guidance table
   Notifications.php        # Registers success notification hooks
   MembershipStanding.php   # Pure GMTU standing classifier (no I/O, fully unit-tested)
   LapsedStore.php          # Persists lapsed flag in wp_options
