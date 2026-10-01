@@ -75,6 +75,7 @@ require_once __DIR__ . '/src/Email.php';
 require_once __DIR__ . '/src/PostcodeValidation.php';
 require_once __DIR__ . '/src/BranchAssignment.php';
 require_once __DIR__ . '/src/Tagging.php';
+require_once __DIR__ . '/src/IncomeGuidance.php';
 require_once __DIR__ . '/src/Notifications.php';
 require_once __DIR__ . '/src/MembershipStanding.php';
 require_once __DIR__ . '/src/LapsedStore.php';
@@ -97,5 +98,6 @@ $config = [
 register_postcode_validation($config);
 register_branch_assignment();
 register_tagging();
+register_income_guidance();
 register_notifications($config);
 register_lapsing_override();
