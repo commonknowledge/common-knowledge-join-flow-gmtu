@@ -119,7 +119,7 @@ The lapsed flag is stored in WordPress `wp_options`, keyed by `gmtu_lapsed_` fol
 
 ## Income guidance
 
-Switches on the parent plugin's income guidance (`ck_join_flow_income_guidance_enabled`), which needs Common Knowledge Join Flow 1.4.44 or newer. On an older parent nothing happens.
+Switches on the parent plugin's income guidance (`ck_join_flow_income_guidance_enabled`), which needs Common Knowledge Join Flow 1.4.45 or newer. On an older parent nothing happens.
 
 The content is set in WordPress, not here:
 

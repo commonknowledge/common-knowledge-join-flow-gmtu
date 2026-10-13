@@ -5,7 +5,7 @@
  * Switches on the parent plugin's income guidance table, which shows income
  * bands against membership tiers. The bands themselves are entered on each
  * membership plan in the Join settings. Needs Common Knowledge Join Flow
- * 1.4.44 or newer; on an older parent the filter is simply never read.
+ * 1.4.45 or newer; on an older parent the filter is simply never read.
  *
  * @package CommonKnowledge\JoinBlock\Organisation\GMTU
  */
