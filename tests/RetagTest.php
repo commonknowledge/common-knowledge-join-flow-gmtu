@@ -658,4 +658,84 @@ class RetagTest extends TestCase
         $this->assertSame(0, $result['counts']['failed']);
         $this->assertSame(1, $result['counts']['move']);
     }
+
+    // A Zetkin write can throw rather than report a status: the parent's
+    // tryAddTagToPerson lets Guzzle's exception through on an HTTP 500. One
+    // member's failure must not end the run for everyone after them.
+
+    private function twoMembersMovingOffSouthManchester(): array
+    {
+        return [
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+            ['id' => 2, 'email' => 'b@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ];
+    }
+
+    private function http500(): \RuntimeException
+    {
+        return new \RuntimeException(
+            'Server error: `PUT people/1/tags` resulted in a `500 Internal Server Error` response'
+        );
+    }
+
+    public function test_a_zetkin_add_that_throws_fails_that_member_and_the_run_carries_on()
+    {
+        [$lister, $tagsGetter, $resolver, , $remover] = $this->fakeZetkin($this->twoMembersMovingOffSouthManchester());
+        $adder = function ($personId, $tagId) {
+            if ($personId === 1) {
+                throw $this->http500();
+            }
+            return 'ok';
+        };
+        [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame(['failed', 'move'], array_column($result['actions'], 'status'));
+        $this->assertSame(1, $result['counts']['failed']);
+        $this->assertSame(1, $result['counts']['move']);
+        $this->assertNotContains('a@example.com', array_column($mc->added, 0));
+        $this->assertNotContains('a@example.com', array_column($mc->removed, 0));
+        $this->assertContains('b@example.com', array_column($mc->added, 0));
+    }
+
+    public function test_a_zetkin_removal_that_throws_fails_that_member_and_the_run_carries_on()
+    {
+        [$lister, $tagsGetter, $resolver, $adder] = $this->fakeZetkin($this->twoMembersMovingOffSouthManchester());
+        $remover = function ($personId, $tagId) {
+            if ($personId === 1) {
+                throw $this->http500();
+            }
+            return 'ok';
+        };
+        [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame(['failed', 'move'], array_column($result['actions'], 'status'));
+        $this->assertNotContains('a@example.com', array_column($mc->added, 0));
+        $this->assertNotContains('a@example.com', array_column($mc->removed, 0));
+        $this->assertContains('b@example.com', array_column($mc->added, 0));
+    }
+
+    /**
+     * Tag lookups are cached per title, so a lookup that throws must not be
+     * cached as a failure: the next member tries again.
+     */
+    public function test_a_tag_lookup_that_throws_fails_that_member_and_the_next_one_retries()
+    {
+        [$lister, $tagsGetter, , $adder, $remover] = $this->fakeZetkin($this->twoMembersMovingOffSouthManchester());
+        $lookups = 0;
+        $resolver = function ($title) use (&$lookups) {
+            $lookups++;
+            if ($lookups === 1) {
+                throw $this->http500();
+            }
+            return ['id' => crc32($title), 'title' => $title];
+        };
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover);
+
+        $this->assertSame(['failed', 'move'], array_column($result['actions'], 'status'));
+    }
 }

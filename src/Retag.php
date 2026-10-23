@@ -320,32 +320,39 @@ function run_branch_retag(
 
         $ok = true;
 
-        if ($action['addTag'] !== null) {
-            $tagId = $resolve($action['addTag']);
-            $ok = $tagId !== null && $add_tag($action['id'], $tagId) === ZetkinService::TAG_OK;
-            if ($ok) {
-                log_info("Tagged {$action['email']} as {$action['addTag']}");
-            } else {
-                log_warning("Could not tag {$action['email']} as {$action['addTag']}");
-            }
-        }
-
-        // Only take the old tag off once the new one is definitely on, so a
-        // failure halfway through leaves a member over-tagged rather than
-        // untagged.
-        if ($ok) {
-            foreach ($action['removeTags'] as $title) {
-                $tagId = $resolve($title);
-                // A missing tag means the end state is already true, which is
-                // as good as removed.
-                $removed = $tagId === null ? ZetkinService::TAG_ERROR : $remove_tag($action['id'], $tagId);
-                if (!in_array($removed, [ZetkinService::TAG_OK, ZetkinService::TAG_MISSING], true)) {
-                    $ok = false;
-                    log_warning("Could not remove tag $title from {$action['email']}");
-                    continue;
+        // The parent's helpers can throw as well as report, for example on an
+        // HTTP 500. One member's failure is counted against that member only.
+        try {
+            if ($action['addTag'] !== null) {
+                $tagId = $resolve($action['addTag']);
+                $ok = $tagId !== null && $add_tag($action['id'], $tagId) === ZetkinService::TAG_OK;
+                if ($ok) {
+                    log_info("Tagged {$action['email']} as {$action['addTag']}");
+                } else {
+                    log_warning("Could not tag {$action['email']} as {$action['addTag']}");
                 }
-                log_info("Removed tag $title from {$action['email']}");
             }
+
+            // Only take the old tag off once the new one is definitely on, so a
+            // failure halfway through leaves a member over-tagged rather than
+            // untagged.
+            if ($ok) {
+                foreach ($action['removeTags'] as $title) {
+                    $tagId = $resolve($title);
+                    // A missing tag means the end state is already true, which is
+                    // as good as removed.
+                    $removed = $tagId === null ? ZetkinService::TAG_ERROR : $remove_tag($action['id'], $tagId);
+                    if (!in_array($removed, [ZetkinService::TAG_OK, ZetkinService::TAG_MISSING], true)) {
+                        $ok = false;
+                        log_warning("Could not remove tag $title from {$action['email']}");
+                        continue;
+                    }
+                    log_info("Removed tag $title from {$action['email']}");
+                }
+            }
+        } catch (\Throwable $e) {
+            $ok = false;
+            log_warning("Zetkin write for {$action['email']} failed: " . $e->getMessage());
         }
 
         if (!$ok) {
