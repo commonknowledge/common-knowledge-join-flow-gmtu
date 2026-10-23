@@ -40,9 +40,11 @@ wp gmtu retag_branches --limit=10 --apply # write those ten, then check them in 
 wp gmtu retag_branches --apply            # the full run
 ```
 
-Only tags whose titles are branch names in `get_branch_map()` are ever removed; every other tag is left alone. A stale branch tag comes off only once the correct one is on, so an interrupted run leaves a member over-tagged rather than untagged. Where an outcode maps to `null`, an existing branch tag is reported for review rather than stripped.
+Only tags whose titles are branch names in `get_branch_map()` are ever removed; every other tag is left alone. In each CRM a stale branch tag comes off only once the correct one is on, so an interrupted run leaves a member over-tagged rather than untagged. Where an outcode maps to `null`, an existing branch tag is reported for review rather than stripped.
 
-Both Zetkin and Mailchimp are updated. The plan is built from Zetkin, because it holds the postcode the branch is calculated from; Mailchimp only receives a postcode inside the `ADDRESS` merge field, which the parent plugin omits on update flows and when no street address was collected. Mailchimp is matched on email afterwards, and only once the Zetkin write for that member has succeeded.
+Both Zetkin and Mailchimp are updated. The plan is built from Zetkin, because it holds the postcode the branch is calculated from; Mailchimp only receives a postcode inside the `ADDRESS` merge field, which the parent plugin omits on update flows and when no street address was collected. Mailchimp is matched on email afterwards, and only once that member is right in Zetkin.
+
+Mailchimp's tags cannot be read through the parent plugin, so it is not given a diff. For every member whose branch is known, it is told to switch the expected branch on, then every other known branch off. That happens whether or not Zetkin needed changing, because Zetkin being right says nothing about what an earlier run left in Mailchimp. Switching off a tag a member does not have is a no-op there, so the run is safe to repeat: if Mailchimp failed for someone, or was not configured the first time, running again puts it right. The cost is one Mailchimp call per known branch for each member found in the audience.
 
 Anyone in Mailchimp but not in Zetkin is therefore never reached, so Mailchimp outcomes are counted separately rather than folded into the totals. If Mailchimp is not configured the run still does its Zetkin job and says so.
 ## Branch tagging
