@@ -27,6 +27,26 @@ The parent plugin fires hooks at each stage of member registration and membershi
 | 8 | `ck_join_flow_should_lapse_member` (filter) | `LapsingOverride.php` | Override lapse decision using GMTU standing rules (see below) |
 | 9 | `ck_join_flow_should_unlapse_member` (filter) | `LapsingOverride.php` | Override unlapse decision using GMTU standing rules (see below) |
 
+## Re-tagging existing members
+
+Changing the branch map only affects people who join after the change. Nothing in the join flow revisits an existing member, so after a branch is renamed, split or added, everyone who joined before it keeps the tag they were given at the time.
+
+`wp gmtu retag_branches` recalculates each member's branch from their postcode in Zetkin and fixes the difference in **both Zetkin and Mailchimp**. It needs Common Knowledge Join Flow **1.4.40 or newer** for the bulk Zetkin and Mailchimp helpers, and refuses to start against anything older rather than failing part way through a run. It previews by default and writes nothing without `--apply`:
+
+```bash
+wp gmtu retag_branches                    # report only, writes nothing
+wp gmtu retag_branches --limit=10         # report on the first ten members
+wp gmtu retag_branches --limit=10 --apply # write those ten, then check them in Zetkin
+wp gmtu retag_branches --apply            # the full run
+```
+
+Only tags whose titles are branch names in `get_branch_map()` are ever removed; every other tag is left alone. In each CRM a stale branch tag comes off only once the correct one is on, so an interrupted run leaves a member over-tagged rather than untagged. Where an outcode maps to `null`, an existing branch tag is reported for review rather than stripped.
+
+Both Zetkin and Mailchimp are updated. The plan is built from Zetkin, because it holds the postcode the branch is calculated from; Mailchimp only receives a postcode inside the `ADDRESS` merge field, which the parent plugin omits on update flows and when no street address was collected. Mailchimp is matched on email afterwards, and only once that member is right in Zetkin.
+
+Mailchimp's tags cannot be read through the parent plugin, so it is not given a diff. For every member whose branch is known, it is told to switch the expected branch on, then every other known branch off. That happens whether or not Zetkin needed changing, because Zetkin being right says nothing about what an earlier run left in Mailchimp. Switching off a tag a member does not have is a no-op there, so the run is safe to repeat: if Mailchimp failed for someone, or was not configured the first time, running again puts it right. The cost is one Mailchimp call per known branch for each member found in the audience.
+
+Anyone in Mailchimp but not in Zetkin is therefore never reached, so Mailchimp outcomes are counted separately rather than folded into the totals. If Mailchimp is not configured the run still does its Zetkin job and says so.
 ## Branch tagging
 
 ### Why this exists
@@ -122,7 +142,7 @@ The lapsed flag is stored in WordPress `wp_options`, keyed by `gmtu_lapsed_` fol
 join-gmtu.php              # Plugin entry point, config, hook registration
 src/
   Logger.php               # Logging utilities (wraps joinBlockLog)
-  Postcode.php             # Postcode outcode lookup via postcodes.io with caching
+  Postcode.php             # Postcode outcode lookup via postcodes.io, plus offline parsing
   Branch.php               # Branch map (outcode -> branch) and branch email map
   Member.php               # Extracts and formats member details from registration data
   Email.php                # Email body building and send functions
@@ -134,6 +154,7 @@ src/
   LapsedStore.php          # Persists lapsed flag in wp_options
   StripePaymentHistory.php # Fetches paid-invoice months from Stripe (Customers + Subscriptions + Invoices)
   LapsingOverride.php      # Hooks into parent lapsing filters using the above three
+  Retag.php                # Bulk branch re-tagging (pure planner, thin Zetkin layer)
 ```
 
 ## Configuration

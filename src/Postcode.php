@@ -66,3 +66,35 @@ function get_postcode_outcode($postcode) {
 
     return $outcode;
 }
+
+/**
+ * Parse the outcode from a postcode without calling the postcodes.io API.
+ *
+ * `get_postcode_outcode()` is the right call during a signup: one member, one
+ * lookup, validated against a real postcode database. Bulk jobs that walk the
+ * whole membership cannot afford an API call each, so they use this instead.
+ *
+ * Accepts a full postcode or a bare outcode, with or without a space, in any
+ * case. Returns null if the input is not shaped like a UK postcode, which
+ * callers should treat as "cannot classify this member" rather than guessing.
+ *
+ * @since 1.5.12
+ *
+ * @param string|null $postcode The postcode to parse.
+ * @return string|null The uppercased outcode, or null if it cannot be parsed.
+ */
+function parse_outcode($postcode) {
+    if (empty($postcode)) {
+        return null;
+    }
+
+    $normalised = strtoupper(preg_replace('/\s+/', '', $postcode));
+
+    // Outward code is 2 to 4 characters; the inward code, if present, is
+    // always a digit followed by two letters.
+    if (!preg_match('/^([A-Z]{1,2}[0-9][A-Z0-9]?)([0-9][A-Z]{2})?$/', $normalised, $matches)) {
+        return null;
+    }
+
+    return $matches[1];
+}
