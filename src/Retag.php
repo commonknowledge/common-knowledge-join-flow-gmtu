@@ -179,8 +179,8 @@ function reconcile_mailchimp_branch(
 /**
  * Check the parent plugin is new enough to do a bulk re-tag.
  *
- * The Zetkin helpers landed in Common Knowledge Join Flow 1.4.38 and the
- * Mailchimp ones in 1.4.39. Against an older parent the run would fatal
+ * The bulk Zetkin and Mailchimp helpers first shipped under their final names
+ * in Common Knowledge Join Flow 1.4.40. Against an older parent the run would fatal
  * partway through, which on a write run could leave members half re-tagged,
  * so refuse before touching anything.
  *
@@ -214,7 +214,7 @@ function require_parent_plugin_helpers() {
             if (!method_exists($class, $method)) {
                 throw new \RuntimeException(
                     "$shortName::$method() is not available. Branch re-tagging needs "
-                    . "Common Knowledge Join Flow 1.4.39 or newer. Update the parent plugin and try again."
+                    . "Common Knowledge Join Flow 1.4.40 or newer. Update the parent plugin and try again."
                 );
             }
         }

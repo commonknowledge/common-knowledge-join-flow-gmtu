@@ -339,8 +339,8 @@ class RetagTest extends TestCase
     }
 
     /**
-     * The command depends on Zetkin helpers added to the parent plugin in
-     * 1.4.38 and Mailchimp ones added in 1.4.39. Against an older parent it
+     * The command depends on bulk Zetkin and Mailchimp helpers that first
+     * shipped, under their final names, in parent 1.4.40. Against an older parent it
      * must say so, not fatal halfway through a run. Neither service exists in
      * the test suite, so the default wiring stands in for an out-of-date
      * parent.
@@ -348,7 +348,7 @@ class RetagTest extends TestCase
     public function test_refuses_to_run_against_a_parent_plugin_without_the_bulk_helpers()
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/1\.4\.39/');
+        $this->expectExceptionMessageMatches('/1\.4\.40 or newer/');
 
         run_branch_retag();
     }
