@@ -245,6 +245,9 @@ class BranchTest extends TestCase
             'M21 Chorlton-cum-Hardy' => ['M21'],
             'M22 Wythenshawe, Northenden' => ['M22'],
             'M23 Baguley, Brooklands' => ['M23'],
+            // GMTU, 23/10/2026: most of M16 falls in South Manchester. The
+            // Alexandra Park estate is Moss Side, and GMTU re-tag those by hand.
+            'M16 Firswood, Old Trafford, Whalley Range' => ['M16'],
         ];
     }
 
