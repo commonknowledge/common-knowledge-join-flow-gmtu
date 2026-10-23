@@ -40,11 +40,12 @@ use CommonKnowledge\JoinBlock\Services\ZetkinService;
  * @param array $people    Person records: id, email, zip_code, tags (list of titles).
  * @param array $branchMap Outcode => branch name map, as per get_branch_map().
  * @return array List of actions: id, email, postcode, outcode, currentBranchTags,
- *               addTag, removeTags, status, reason. Status is one of move, add,
- *               remove, unchanged, review, skipped.
+ *               expectedBranch, addTag, removeTags, status, reason. Status is one
+ *               of move, add, remove, unchanged, review, skipped. expectedBranch
+ *               is null wherever the right branch is not known.
  */
 function plan_branch_retag(array $people, array $branchMap): array {
-    $knownBranches = array_values(array_unique(array_filter(array_values($branchMap))));
+    $knownBranches = known_branch_names($branchMap);
 
     $actions = [];
 
@@ -59,6 +60,7 @@ function plan_branch_retag(array $people, array $branchMap): array {
             'postcode' => $postcode,
             'outcode' => $outcode,
             'currentBranchTags' => array_values(array_intersect($tags, $knownBranches)),
+            'expectedBranch' => null,
             'addTag' => null,
             'removeTags' => [],
             'status' => 'skipped',
@@ -93,6 +95,8 @@ function plan_branch_retag(array $people, array $branchMap): array {
             continue;
         }
 
+        $action['expectedBranch'] = $expected;
+
         $needsAdd = !in_array($expected, $current, true);
         $stale = array_values(array_diff($current, [$expected]));
 
@@ -117,6 +121,59 @@ function plan_branch_retag(array $people, array $branchMap): array {
     }
 
     return $actions;
+}
+
+/**
+ * Every branch name in the map, in map order, without the null "no branch" entries.
+ *
+ * @since 1.5.12
+ *
+ * @param array $branchMap Outcode => branch name map, as per get_branch_map().
+ * @return string[]
+ */
+function known_branch_names(array $branchMap): array {
+    return array_values(array_unique(array_filter(array_values($branchMap))));
+}
+
+/**
+ * Bring one member's Mailchimp branch tags into line with their expected branch.
+ *
+ * Mailchimp's tags cannot be read through the parent plugin, so this does not
+ * work from a diff. It switches the expected branch on, then switches every
+ * other known branch off; switching off a tag the member lacks is a no-op in
+ * Mailchimp. That makes it safe to repeat, and lets any later run put right
+ * what an earlier one could not, whatever state that run left behind.
+ *
+ * The expected branch goes on first and nothing comes off unless it did, so a
+ * failure part way leaves the member over-tagged rather than with no branch.
+ *
+ * @since 1.5.12
+ *
+ * @return string A MailchimpService::TAG_* status.
+ */
+function reconcile_mailchimp_branch(
+    string $email,
+    string $expected,
+    array $knownBranches,
+    callable $add,
+    callable $remove
+): string {
+    $status = $add($email, $expected);
+    if ($status !== MailchimpService::TAG_OK) {
+        return $status;
+    }
+
+    foreach ($knownBranches as $branch) {
+        if ($branch === $expected) {
+            continue;
+        }
+        $status = $remove($email, $branch);
+        if ($status !== MailchimpService::TAG_OK) {
+            return $status;
+        }
+    }
+
+    return MailchimpService::TAG_OK;
 }
 
 /**
@@ -280,7 +337,9 @@ function run_branch_retag(
         $people = array_slice($people, 0, $limit);
     }
 
-    $actions = plan_branch_retag($people, get_branch_map());
+    $branchMap = get_branch_map();
+    $knownBranches = known_branch_names($branchMap);
+    $actions = plan_branch_retag($people, $branchMap);
 
     $counts = [
         'move' => 0,
@@ -290,7 +349,7 @@ function run_branch_retag(
         'review' => 0,
         'skipped' => 0,
         'failed' => 0,
-        'mailchimpUpdated' => 0,
+        'mailchimpReconciled' => 0,
         'mailchimpNotFound' => 0,
         'mailchimpFailed' => 0,
     ];
@@ -311,10 +370,6 @@ function run_branch_retag(
         $actions[$index]['mailchimp'] = $mailchimpEnabled ? 'skipped' : 'disabled';
 
         if (!$apply) {
-            continue;
-        }
-
-        if ($action['addTag'] === null && empty($action['removeTags'])) {
             continue;
         }
 
@@ -362,34 +417,32 @@ function run_branch_retag(
             continue;
         }
 
-        if (!$mailchimpEnabled) {
+        // Only once Zetkin is settled, and only where the right branch is known.
+        // Pushing to Mailchimp after a failed Zetkin write would drive the two
+        // further apart, and review or skipped members have nothing to match.
+        // Mailchimp is brought into line even when Zetkin needed nothing, since
+        // Zetkin being right says nothing about what an earlier run left there.
+        if (!$mailchimpEnabled || $action['expectedBranch'] === null) {
             continue;
         }
 
-        // Only once Zetkin is settled. Pushing a change to Mailchimp after a
-        // failed Zetkin write would drive the two further apart, not together.
-        $mailchimpResult = MailchimpService::TAG_OK;
-
-        if ($action['addTag'] !== null) {
-            $mailchimpResult = $mc_add_tag($action['email'], $action['addTag']);
-        }
-
-        // Add before remove here too, so an interruption leaves a member
-        // over-tagged in Mailchimp rather than with no branch at all.
-        if ($mailchimpResult === MailchimpService::TAG_OK) {
-            foreach ($action['removeTags'] as $title) {
-                $status = $mc_remove_tag($action['email'], $title);
-                if ($status !== MailchimpService::TAG_OK) {
-                    $mailchimpResult = $status;
-                    break;
-                }
-            }
+        try {
+            $mailchimpResult = reconcile_mailchimp_branch(
+                $action['email'],
+                $action['expectedBranch'],
+                $knownBranches,
+                $mc_add_tag,
+                $mc_remove_tag
+            );
+        } catch (\Throwable $e) {
+            $mailchimpResult = MailchimpService::TAG_ERROR;
+            log_warning("Mailchimp write for {$action['email']} failed: " . $e->getMessage());
         }
 
         $actions[$index]['mailchimp'] = $mailchimpResult;
 
         if ($mailchimpResult === MailchimpService::TAG_OK) {
-            $counts['mailchimpUpdated']++;
+            $counts['mailchimpReconciled']++;
         } elseif ($mailchimpResult === MailchimpService::TAG_NOT_FOUND) {
             $counts['mailchimpNotFound']++;
             log_info("{$action['email']} is not in the Mailchimp audience, so only Zetkin was updated");

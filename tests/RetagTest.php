@@ -2,6 +2,7 @@
 
 namespace CommonKnowledge\JoinBlock\Organisation\GMTU\Tests;
 
+use function CommonKnowledge\JoinBlock\Organisation\GMTU\get_branch_map;
 use function CommonKnowledge\JoinBlock\Organisation\GMTU\parent_plugin_required_helpers;
 use function CommonKnowledge\JoinBlock\Organisation\GMTU\plan_branch_retag;
 use function CommonKnowledge\JoinBlock\Organisation\GMTU\run_branch_retag;
@@ -181,6 +182,26 @@ class RetagTest extends TestCase
         $this->assertSame('member@example.com', $action['email']);
         $this->assertSame('m1 1aa', $action['postcode']);
         $this->assertSame('M1', $action['outcode']);
+    }
+
+    public function test_action_names_the_branch_the_member_should_be_on()
+    {
+        $moving = $this->planOne($this->person(['tags' => ['South Manchester']]));
+        $settled = $this->planOne($this->person(['zip_code' => 'M20 2AA', 'tags' => ['South Manchester']]));
+
+        $this->assertSame('City Centre and Salford', $moving['expectedBranch']);
+        $this->assertSame('South Manchester', $settled['expectedBranch']);
+    }
+
+    public function test_action_has_no_expected_branch_where_the_answer_is_not_known()
+    {
+        $noBranch = $this->planOne($this->person(['zip_code' => 'M5 3AA', 'tags' => ['South Manchester']]));
+        $unreadable = $this->planOne($this->person(['zip_code' => 'rubbish']));
+        $outOfArea = $this->planOne($this->person(['zip_code' => 'SW1A 1AA']));
+
+        $this->assertNull($noBranch['expectedBranch']);
+        $this->assertNull($unreadable['expectedBranch']);
+        $this->assertNull($outOfArea['expectedBranch']);
     }
 
     public function test_plans_every_person_given()
@@ -445,6 +466,19 @@ class RetagTest extends TestCase
         return [$adder, $remover, $calls];
     }
 
+    /**
+     * Mailchimp's tags cannot be read, so it is told to switch off every known
+     * branch other than the expected one. Switching off a tag the member does
+     * not have is a no-op there.
+     */
+    private function mailchimpRemovalsFor(string $email, string $expected): array
+    {
+        $branches = array_values(array_unique(array_filter(array_values(get_branch_map()))));
+        $others = array_values(array_filter($branches, fn($branch) => $branch !== $expected));
+
+        return array_map(fn($branch) => [$email, $branch], $others);
+    }
+
     public function test_apply_also_retags_in_mailchimp()
     {
         [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
@@ -455,7 +489,7 @@ class RetagTest extends TestCase
         $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
 
         $this->assertSame([['a@example.com', 'City Centre and Salford']], $mc->added);
-        $this->assertSame([['a@example.com', 'South Manchester']], $mc->removed);
+        $this->assertSame($this->mailchimpRemovalsFor('a@example.com', 'City Centre and Salford'), $mc->removed);
         $this->assertSame('ok', $result['actions'][0]['mailchimp']);
     }
 
@@ -472,7 +506,10 @@ class RetagTest extends TestCase
 
         run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
 
-        $this->assertSame(['add:City Centre and Salford', 'remove:South Manchester'], $mc->order);
+        $this->assertSame('add:City Centre and Salford', $mc->order[0]);
+        $verbsAfterTheAdd = array_map(fn($call) => explode(':', $call)[0], array_slice($mc->order, 1));
+        $this->assertSame(['remove'], array_values(array_unique($verbsAfterTheAdd)));
+        $this->assertContains('remove:South Manchester', $mc->order);
     }
 
     public function test_dry_run_writes_nothing_to_mailchimp()
@@ -488,7 +525,12 @@ class RetagTest extends TestCase
         $this->assertSame([], $mc->removed);
     }
 
-    public function test_members_already_on_the_right_branch_are_not_touched_in_mailchimp()
+    /**
+     * Zetkin being right says nothing about Mailchimp: an earlier run may have
+     * failed there, or had Mailchimp switched off. Every member with a known
+     * branch is brought into line in Mailchimp, whether or not Zetkin changed.
+     */
+    public function test_members_already_right_in_zetkin_are_still_brought_into_line_in_mailchimp()
     {
         [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
             ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M20 2AA', 'tags' => ['South Manchester']],
@@ -497,8 +539,8 @@ class RetagTest extends TestCase
 
         run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
 
-        $this->assertSame([], $mc->added);
-        $this->assertSame([], $mc->removed);
+        $this->assertSame([['a@example.com', 'South Manchester']], $mc->added);
+        $this->assertSame($this->mailchimpRemovalsFor('a@example.com', 'South Manchester'), $mc->removed);
     }
 
     /**
@@ -569,7 +611,7 @@ class RetagTest extends TestCase
         $this->assertSame(1, $result['counts']['failed']);
     }
 
-    public function test_mailchimp_updates_are_counted()
+    public function test_mailchimp_outcomes_are_counted()
     {
         [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
             ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
@@ -580,7 +622,7 @@ class RetagTest extends TestCase
 
         $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
 
-        $this->assertSame(2, $result['counts']['mailchimpUpdated']);
+        $this->assertSame(3, $result['counts']['mailchimpReconciled']);
         $this->assertSame(0, $result['counts']['mailchimpNotFound']);
         $this->assertSame(0, $result['counts']['mailchimpFailed']);
     }
@@ -737,5 +779,219 @@ class RetagTest extends TestCase
         $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover);
 
         $this->assertSame(['failed', 'move'], array_column($result['actions'], 'status'));
+    }
+
+    // Successive runs. A run that half-succeeds must be put right by running
+    // it again, so these use CRMs whose tags really change when written to.
+
+    /**
+     * One member, id 1, a@example.com, postcode M1 (City Centre and Salford).
+     * Returns the shared state and a function that applies one run against it.
+     * Queue one-shot failures in $state->failNext, keyed "crm:verb:tag", as a
+     * status string or a Throwable to throw.
+     */
+    private function statefulCrms(array $zetkinTags, ?array $mailchimpTags): array
+    {
+        $state = new \stdClass();
+        $state->zetkin = $zetkinTags;
+        $state->mailchimp = $mailchimpTags;
+        $state->failNext = [];
+        $state->mailchimpCalls = [];
+
+        $email = 'a@example.com';
+
+        $failure = function (string $key) use ($state) {
+            if (!array_key_exists($key, $state->failNext)) {
+                return null;
+            }
+            $outcome = $state->failNext[$key];
+            unset($state->failNext[$key]);
+            if ($outcome instanceof \Throwable) {
+                throw $outcome;
+            }
+            return $outcome;
+        };
+
+        $lister = fn($page, $perPage) => $page === 0
+            ? [['id' => 1, 'email' => $email, 'zip_code' => 'M1 1AA']]
+            : [];
+        $tagsGetter = fn($personId) => array_map(fn($title) => ['id' => $title, 'title' => $title], $state->zetkin);
+        $resolver = fn($title) => ['id' => $title, 'title' => $title];
+        $adder = function ($personId, $tag) use ($state, $failure) {
+            if (($failed = $failure("zetkin:add:$tag")) !== null) {
+                return $failed;
+            }
+            $state->zetkin = array_values(array_unique(array_merge($state->zetkin, [$tag])));
+            return 'ok';
+        };
+        $remover = function ($personId, $tag) use ($state, $failure) {
+            if (($failed = $failure("zetkin:remove:$tag")) !== null) {
+                return $failed;
+            }
+            if (!in_array($tag, $state->zetkin, true)) {
+                return 'missing';
+            }
+            $state->zetkin = array_values(array_diff($state->zetkin, [$tag]));
+            return 'ok';
+        };
+        $mcAdd = function ($email, $tag) use ($state, $failure) {
+            $state->mailchimpCalls[] = "add:$tag";
+            if (($failed = $failure("mailchimp:add:$tag")) !== null) {
+                return $failed;
+            }
+            if ($state->mailchimp === null) {
+                return 'not_found';
+            }
+            $state->mailchimp = array_values(array_unique(array_merge($state->mailchimp, [$tag])));
+            return 'ok';
+        };
+        $mcRemove = function ($email, $tag) use ($state, $failure) {
+            $state->mailchimpCalls[] = "remove:$tag";
+            if (($failed = $failure("mailchimp:remove:$tag")) !== null) {
+                return $failed;
+            }
+            if ($state->mailchimp === null) {
+                return 'not_found';
+            }
+            $state->mailchimp = array_values(array_diff($state->mailchimp, [$tag]));
+            return 'ok';
+        };
+
+        $run = function (bool $withMailchimp = true) use ($lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove) {
+            return $withMailchimp
+                ? run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove)
+                : run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover);
+        };
+
+        return [$state, $run];
+    }
+
+    /**
+     * Zetkin adds the new branch but fails to remove the old one, so Mailchimp
+     * is rightly left alone. The retry is removal-only in Zetkin, because the
+     * new tag is already there. Mailchimp must still gain the new branch before
+     * losing the old one, or it ends up with no branch at all.
+     */
+    public function test_a_retry_after_a_failed_zetkin_removal_leaves_mailchimp_on_the_new_branch()
+    {
+        [$state, $run] = $this->statefulCrms(['South Manchester'], ['South Manchester']);
+        $state->failNext['zetkin:remove:South Manchester'] = 'error';
+
+        $first = $run();
+
+        $this->assertSame('failed', $first['actions'][0]['status']);
+        $this->assertSame(['South Manchester'], $state->mailchimp);
+
+        $second = $run();
+
+        $this->assertSame('remove', $second['actions'][0]['status']);
+        $this->assertSame(['City Centre and Salford'], $state->zetkin);
+        $this->assertSame(['City Centre and Salford'], $state->mailchimp);
+    }
+
+    public function test_a_mailchimp_failure_is_put_right_by_the_next_run()
+    {
+        [$state, $run] = $this->statefulCrms(['South Manchester'], ['South Manchester']);
+        $state->failNext['mailchimp:add:City Centre and Salford'] = 'error';
+
+        $first = $run();
+
+        $this->assertSame('error', $first['actions'][0]['mailchimp']);
+        $this->assertSame(['City Centre and Salford'], $state->zetkin);
+        $this->assertSame(['South Manchester'], $state->mailchimp);
+
+        $second = $run();
+
+        $this->assertSame('unchanged', $second['actions'][0]['status']);
+        $this->assertSame('ok', $second['actions'][0]['mailchimp']);
+        $this->assertSame(['City Centre and Salford'], $state->mailchimp);
+    }
+
+    public function test_a_failed_mailchimp_removal_is_put_right_by_the_next_run()
+    {
+        [$state, $run] = $this->statefulCrms(['South Manchester'], ['South Manchester']);
+        $state->failNext['mailchimp:remove:South Manchester'] = 'error';
+
+        $run();
+
+        $this->assertSame(['South Manchester', 'City Centre and Salford'], $state->mailchimp);
+
+        $run();
+
+        $this->assertSame(['City Centre and Salford'], $state->mailchimp);
+    }
+
+    public function test_mailchimp_switched_off_for_the_first_run_is_put_right_by_a_later_one()
+    {
+        [$state, $run] = $this->statefulCrms(['South Manchester'], ['South Manchester']);
+
+        $first = $run(false);
+
+        $this->assertSame('disabled', $first['actions'][0]['mailchimp']);
+        $this->assertSame(['City Centre and Salford'], $state->zetkin);
+        $this->assertSame(['South Manchester'], $state->mailchimp);
+
+        $run(true);
+
+        $this->assertSame(['City Centre and Salford'], $state->mailchimp);
+    }
+
+    public function test_bringing_mailchimp_into_line_keeps_its_non_branch_tags()
+    {
+        [$state, $run] = $this->statefulCrms(['South Manchester'], ['Newsletter', 'South Manchester', 'Volunteer']);
+
+        $run();
+
+        $this->assertSame(['Newsletter', 'Volunteer', 'City Centre and Salford'], $state->mailchimp);
+    }
+
+    public function test_a_mailchimp_call_that_throws_is_counted_and_put_right_by_the_next_run()
+    {
+        [$state, $run] = $this->statefulCrms(['South Manchester'], ['South Manchester']);
+        $state->failNext['mailchimp:add:City Centre and Salford'] = $this->http500();
+
+        $first = $run();
+
+        $this->assertSame('error', $first['actions'][0]['mailchimp']);
+        $this->assertSame(1, $first['counts']['mailchimpFailed']);
+        $this->assertSame(0, $first['counts']['failed']);
+
+        $run();
+
+        $this->assertSame(['City Centre and Salford'], $state->mailchimp);
+    }
+
+    /**
+     * Rerunning a finished job changes nothing: same end state, every time.
+     */
+    public function test_rerunning_a_completed_job_changes_nothing()
+    {
+        [$state, $run] = $this->statefulCrms(['South Manchester'], ['South Manchester']);
+
+        $run();
+        $second = $run();
+
+        $this->assertSame('unchanged', $second['actions'][0]['status']);
+        $this->assertSame(['City Centre and Salford'], $state->zetkin);
+        $this->assertSame(['City Centre and Salford'], $state->mailchimp);
+    }
+
+    /**
+     * Review and skipped members have no known branch, so there is nothing to
+     * bring Mailchimp into line with. It is not called for them at all.
+     */
+    public function test_mailchimp_is_not_called_for_members_without_a_known_branch()
+    {
+        [$lister, $tagsGetter, $resolver, $adder, $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M29 1AA', 'tags' => ['South Manchester']],
+            ['id' => 2, 'email' => 'b@example.com', 'zip_code' => 'rubbish', 'tags' => ['South Manchester']],
+        ]);
+        [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
+
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+
+        $this->assertSame(['review', 'skipped'], array_column($result['actions'], 'status'));
+        $this->assertSame([], $mc->added);
+        $this->assertSame([], $mc->removed);
     }
 }

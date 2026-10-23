@@ -145,7 +145,9 @@ if (defined('WP_CLI') && WP_CLI) {
 
         $rows = [];
         foreach ($result['actions'] as $action) {
-            if ($action['status'] === 'unchanged') {
+            // Right in Zetkin is the quiet majority. Show them only if Mailchimp
+            // could not be brought into line, so a failure there is not hidden.
+            if ($action['status'] === 'unchanged' && ($action['mailchimp'] ?? '') !== 'error') {
                 continue;
             }
             $rows[] = [
@@ -201,19 +203,19 @@ if (defined('WP_CLI') && WP_CLI) {
             );
         } else {
             \WP_CLI::log('');
-            \WP_CLI::log("Also updated in Mailchimp: {$counts['mailchimpUpdated']}");
+            \WP_CLI::log("Brought into line in Mailchimp: {$counts['mailchimpReconciled']}");
 
             if ($counts['mailchimpNotFound'] > 0) {
                 \WP_CLI::warning(
                     "Not in the Mailchimp audience: {$counts['mailchimpNotFound']}. "
-                    . 'These were updated in Zetkin only.'
+                    . 'Their branch is only correct in Zetkin.'
                 );
             }
 
             if ($counts['mailchimpFailed'] > 0) {
                 \WP_CLI::warning(
                     "Mailchimp update failed: {$counts['mailchimpFailed']}. "
-                    . 'Zetkin was updated for these members. See the log for details.'
+                    . 'Zetkin is correct for these members. Run again to retry Mailchimp; see the log for details.'
                 );
             }
         }
