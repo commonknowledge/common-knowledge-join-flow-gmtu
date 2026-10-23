@@ -56,3 +56,15 @@ jobs:
             --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # An installable zip for WordPress's "Upload Plugin", built from the
+      # tag. Only the files the plugin loads at runtime, inside a folder
+      # named as docker-compose.yml installs it.
+      - name: Attach plugin zip to release
+        run: |
+          TAG="v${{ steps.version.outputs.new }}"
+          ZIP="join-flow-gmtu-${{ steps.version.outputs.new }}.zip"
+          git archive --format=zip --prefix=join-flow-gmtu/ -o "$ZIP" "$TAG" join-gmtu.php src README.md
+          gh release upload "$TAG" "$ZIP"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
