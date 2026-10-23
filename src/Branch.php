@@ -32,7 +32,7 @@ function get_branch_map() {
         "M13" => "Leve-Longsight",
         "M14" => "Moss Side",
         "M15" => "Hulme",
-        "M16" => "Moss Side",
+        "M16" => "South Manchester",
         "M17" => "City Centre and Salford",
         "M18" => "Leve-Longsight",
         "M19" => "Leve-Longsight",
