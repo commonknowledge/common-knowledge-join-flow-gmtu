@@ -6,6 +6,7 @@ use function CommonKnowledge\JoinBlock\Organisation\GMTU\get_branch_map;
 use function CommonKnowledge\JoinBlock\Organisation\GMTU\parent_plugin_required_helpers;
 use function CommonKnowledge\JoinBlock\Organisation\GMTU\plan_branch_retag;
 use function CommonKnowledge\JoinBlock\Organisation\GMTU\run_branch_retag;
+use function CommonKnowledge\JoinBlock\Organisation\GMTU\with_retries;
 
 class RetagTest extends TestCase
 {
@@ -713,6 +714,15 @@ class RetagTest extends TestCase
         ];
     }
 
+    /**
+     * Retries pause between attempts. Tests must not actually wait.
+     */
+    private function noPause(): callable
+    {
+        return function ($seconds) {
+        };
+    }
+
     private function http500(): \RuntimeException
     {
         return new \RuntimeException(
@@ -731,7 +741,7 @@ class RetagTest extends TestCase
         };
         [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
 
-        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove, $this->noPause());
 
         $this->assertSame(['failed', 'move'], array_column($result['actions'], 'status'));
         $this->assertSame(1, $result['counts']['failed']);
@@ -752,7 +762,7 @@ class RetagTest extends TestCase
         };
         [$mcAdd, $mcRemove, $mc] = $this->fakeMailchimp();
 
-        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove);
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove, $this->noPause());
 
         $this->assertSame(['failed', 'move'], array_column($result['actions'], 'status'));
         $this->assertNotContains('a@example.com', array_column($mc->added, 0));
@@ -761,22 +771,22 @@ class RetagTest extends TestCase
     }
 
     /**
-     * Tag lookups are cached per title, so a lookup that throws must not be
-     * cached as a failure: the next member tries again.
+     * Tag lookups are cached per title, so a lookup that still fails after
+     * its retries must not be cached as a failure: the next member tries again.
      */
-    public function test_a_tag_lookup_that_throws_fails_that_member_and_the_next_one_retries()
+    public function test_a_tag_lookup_that_keeps_throwing_fails_that_member_and_the_next_one_retries()
     {
         [$lister, $tagsGetter, , $adder, $remover] = $this->fakeZetkin($this->twoMembersMovingOffSouthManchester());
         $lookups = 0;
         $resolver = function ($title) use (&$lookups) {
             $lookups++;
-            if ($lookups === 1) {
+            if ($lookups <= 3) {
                 throw $this->http500();
             }
             return ['id' => crc32($title), 'title' => $title];
         };
 
-        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover);
+        $result = run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, null, null, $this->noPause());
 
         $this->assertSame(['failed', 'move'], array_column($result['actions'], 'status'));
     }
@@ -859,8 +869,8 @@ class RetagTest extends TestCase
 
         $run = function (bool $withMailchimp = true) use ($lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove) {
             return $withMailchimp
-                ? run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove)
-                : run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover);
+                ? run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, $mcAdd, $mcRemove, $this->noPause())
+                : run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, null, null, $this->noPause());
         };
 
         return [$state, $run];
@@ -993,5 +1003,143 @@ class RetagTest extends TestCase
         $this->assertSame(['review', 'skipped'], array_column($result['actions'], 'status'));
         $this->assertSame([], $mc->added);
         $this->assertSame([], $mc->removed);
+    }
+
+    // Dropped connections. Zetkin drops the odd connection, and a full run
+    // makes over a thousand of them, so each Zetkin call gets two retries.
+
+    private function recordingPauses(): array
+    {
+        $pauses = new \stdClass();
+        $pauses->seconds = [];
+        $sleeper = function ($seconds) use ($pauses) {
+            $pauses->seconds[] = $seconds;
+        };
+        return [$sleeper, $pauses];
+    }
+
+    private function failingTimes(int $failures, $result = 'done'): array
+    {
+        $calls = new \stdClass();
+        $calls->count = 0;
+        $call = function () use ($failures, $result, $calls) {
+            $calls->count++;
+            if ($calls->count <= $failures) {
+                throw new \RuntimeException("dropped connection {$calls->count}");
+            }
+            return $result;
+        };
+        return [$call, $calls];
+    }
+
+    public function test_a_call_that_works_first_time_is_not_retried()
+    {
+        [$sleeper, $pauses] = $this->recordingPauses();
+        [$call, $calls] = $this->failingTimes(0);
+
+        $this->assertSame('done', with_retries($call, $sleeper));
+        $this->assertSame(1, $calls->count);
+        $this->assertSame([], $pauses->seconds);
+    }
+
+    public function test_a_dropped_connection_is_retried_after_a_pause()
+    {
+        [$sleeper, $pauses] = $this->recordingPauses();
+        [$call, $calls] = $this->failingTimes(2);
+
+        $this->assertSame('done', with_retries($call, $sleeper));
+        $this->assertSame(3, $calls->count);
+        $this->assertSame([2, 5], $pauses->seconds);
+    }
+
+    public function test_after_three_failed_attempts_the_last_error_is_passed_on()
+    {
+        [$sleeper, $pauses] = $this->recordingPauses();
+        [$call, $calls] = $this->failingTimes(99);
+
+        try {
+            with_retries($call, $sleeper);
+            $this->fail('Expected the last error to be passed on');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('dropped connection 3', $e->getMessage());
+        }
+        $this->assertSame(3, $calls->count);
+        $this->assertSame([2, 5], $pauses->seconds);
+    }
+
+    /**
+     * A bug in our own code will fail the same way every time, so retrying
+     * it only wastes time. Only exceptions are retried, not PHP errors.
+     */
+    public function test_a_programming_error_is_not_retried()
+    {
+        [$sleeper, $pauses] = $this->recordingPauses();
+        $calls = 0;
+        $call = function () use (&$calls) {
+            $calls++;
+            throw new \TypeError('a bug, not a dropped connection');
+        };
+
+        try {
+            with_retries($call, $sleeper);
+            $this->fail('Expected the error to be passed on');
+        } catch (\TypeError $e) {
+            $this->assertSame(1, $calls);
+        }
+        $this->assertSame([], $pauses->seconds);
+    }
+
+    public function test_a_dropped_connection_while_reading_members_is_retried()
+    {
+        [, , $resolver, $adder, $remover] = $this->fakeZetkin([]);
+        [$listPage, $listCalls] = $this->failingTimes(1, [
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA'],
+        ]);
+        $lister = fn($page, $perPage) => $page === 0 ? $listPage() : [];
+        [$readTags] = $this->failingTimes(1, [['id' => 'sm', 'title' => 'South Manchester']]);
+        $tagsGetter = fn($personId) => $readTags();
+
+        $result = run_branch_retag(false, null, $lister, $tagsGetter, $resolver, $adder, $remover, null, null, $this->noPause());
+
+        $this->assertSame(['move'], array_column($result['actions'], 'status'));
+        $this->assertSame(['South Manchester'], $result['actions'][0]['currentBranchTags']);
+    }
+
+    public function test_a_dropped_connection_while_writing_is_retried_and_the_member_still_moves()
+    {
+        [$lister, $tagsGetter, $resolver, , $remover] = $this->fakeZetkin([
+            ['id' => 1, 'email' => 'a@example.com', 'zip_code' => 'M1 1AA', 'tags' => ['South Manchester']],
+        ]);
+        [$adder, $addCalls] = $this->failingTimes(2, 'ok');
+
+        $result = run_branch_retag(
+            true, null, $lister, $tagsGetter, fn($t) => $resolver($t), fn($id, $tag) => $adder(), $remover,
+            null, null, $this->noPause()
+        );
+
+        $this->assertSame(['move'], array_column($result['actions'], 'status'));
+        $this->assertSame(0, $result['counts']['failed']);
+        $this->assertSame(3, $addCalls->count);
+    }
+
+    /**
+     * Every member is read before anything is written, so if Zetkin cannot be
+     * read even after retrying, nothing has changed. Say so plainly.
+     */
+    public function test_if_members_cannot_be_read_even_after_retrying_the_run_stops_before_writing()
+    {
+        [, $tagsGetter, $resolver, $adder, $remover, $calls] = $this->fakeZetkin([]);
+        [$listPage] = $this->failingTimes(99);
+        $lister = fn($page, $perPage) => $listPage();
+
+        try {
+            run_branch_retag(true, null, $lister, $tagsGetter, $resolver, $adder, $remover, null, null, $this->noPause());
+            $this->fail('Expected the run to stop');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Nothing was written', $e->getMessage());
+            $this->assertStringContainsString('dropped connection 3', $e->getMessage());
+        }
+        $this->assertSame([], $calls->added);
+        $this->assertSame([], $calls->removed);
     }
 }
