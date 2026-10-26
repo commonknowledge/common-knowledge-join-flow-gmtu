@@ -222,6 +222,45 @@ function require_parent_plugin_helpers() {
 }
 
 /**
+ * Make a call, and try it again if it throws.
+ *
+ * Zetkin drops the odd connection, and a full run makes over a thousand of
+ * them, so without this one dropped connection could stop the run. Every call
+ * this wraps is safe to repeat: adding a tag that is already there, or
+ * removing one that has gone, changes nothing, and a tag lookup re-reads the
+ * list before creating anything, so a retry cannot duplicate a tag.
+ *
+ * Only exceptions are retried. A PHP error is a bug in our own code, which
+ * would fail the same way every time.
+ *
+ * @since 1.5.16
+ *
+ * @param callable      $call    The call to make.
+ * @param callable|null $sleeper fn(int $seconds), for tests. Defaults to sleep().
+ * @return mixed Whatever $call returns.
+ * @throws \Exception The last failure, once all three attempts have been used.
+ */
+function with_retries(callable $call, ?callable $sleeper = null) {
+    $sleep = $sleeper ?? fn($seconds) => sleep($seconds);
+    $pauses = [2, 5];
+    $attempts = count($pauses) + 1;
+
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            return $call();
+        } catch (\Exception $e) {
+            if ($attempt >= $attempts) {
+                throw $e;
+            }
+            $pause = $pauses[$attempt - 1];
+            log_warning("Zetkin call failed (attempt $attempt of $attempts), trying again in {$pause}s: "
+                . $e->getMessage());
+            $sleep($pause);
+        }
+    }
+}
+
+/**
  * Walk the membership and bring branch tags into line with the branch map.
  *
  * Previews by default. Nothing is written unless $apply is true.
@@ -240,7 +279,10 @@ function require_parent_plugin_helpers() {
  * @param callable|null $tag_remover   fn($personId, $tagId): string, a ZetkinService::TAG_* value
  * @param callable|null $mc_tag_adder   fn(string $email, string $tag): string
  * @param callable|null $mc_tag_remover fn(string $email, string $tag): string
+ * @param callable|null $sleeper        fn(int $seconds), the pause between retries
  * @return array{actions: array, counts: array, applied: bool, mailchimpEnabled: bool}
+ * @throws \RuntimeException If members cannot be read from Zetkin even after
+ *                           retrying. Nothing has been written at that point.
  */
 function run_branch_retag(
     bool $apply = false,
@@ -251,7 +293,8 @@ function run_branch_retag(
     ?callable $tag_adder = null,
     ?callable $tag_remover = null,
     ?callable $mc_tag_adder = null,
-    ?callable $mc_tag_remover = null
+    ?callable $mc_tag_remover = null,
+    ?callable $sleeper = null
 ): array {
     $usingParentPlugin = $people_lister === null
         || $tags_getter === null
@@ -285,6 +328,8 @@ function run_branch_retag(
     $mc_add_tag    = $mc_tag_adder   ?? fn($email, $tag) => MailchimpService::tryAddTag($email, $tag);
     $mc_remove_tag = $mc_tag_remover ?? fn($email, $tag) => MailchimpService::tryRemoveTag($email, $tag);
 
+    $retry = fn(callable $call) => with_retries($call, $sleeper);
+
     $perPage = 100;
     $people = [];
     $page = 0;
@@ -293,44 +338,55 @@ function run_branch_retag(
     // would otherwise walk until the process runs out of memory.
     $seen = [];
 
-    while ($limit === null || count($people) < $limit) {
-        $batch = $list_people($page, $perPage);
-        if (empty($batch)) {
-            break;
-        }
-
-        $newInBatch = 0;
-
-        foreach ($batch as $person) {
-            $personId = $person['id'] ?? null;
-            $key = $personId ?? ($person['email'] ?? null);
-
-            if ($key === null) {
-                log_warning('Skipping a Zetkin record with neither an id nor an email');
-                continue;
+    // Every member is read before anything is written, so a read that fails
+    // even after retrying leaves nothing half done.
+    try {
+        while ($limit === null || count($people) < $limit) {
+            $batch = $retry(fn() => $list_people($page, $perPage));
+            if (empty($batch)) {
+                break;
             }
 
-            if (isset($seen[$key])) {
-                continue;
+            $newInBatch = 0;
+
+            foreach ($batch as $person) {
+                $personId = $person['id'] ?? null;
+                $key = $personId ?? ($person['email'] ?? null);
+
+                if ($key === null) {
+                    log_warning('Skipping a Zetkin record with neither an id nor an email');
+                    continue;
+                }
+
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $newInBatch++;
+
+                $people[] = [
+                    'id' => $personId,
+                    'email' => $person['email'] ?? '',
+                    'zip_code' => $person['zip_code'] ?? '',
+                    'tags' => array_column($retry(fn() => $get_tags($personId)), 'title'),
+                ];
             }
-            $seen[$key] = true;
-            $newInBatch++;
 
-            $people[] = [
-                'id' => $personId,
-                'email' => $person['email'] ?? '',
-                'zip_code' => $person['zip_code'] ?? '',
-                'tags' => array_column($get_tags($personId), 'title'),
-            ];
+            if ($newInBatch === 0) {
+                log_warning("Zetkin returned no new people on page $page, stopping the walk there. "
+                    . "Check that the people endpoint is paging as expected.");
+                break;
+            }
+
+            $page++;
         }
-
-        if ($newInBatch === 0) {
-            log_warning("Zetkin returned no new people on page $page, stopping the walk there. "
-                . "Check that the people endpoint is paging as expected.");
-            break;
-        }
-
-        $page++;
+    } catch (\Exception $e) {
+        throw new \RuntimeException(
+            "Could not read members from Zetkin, even after retrying: {$e->getMessage()} "
+            . "Nothing was written. Run it again.",
+            0,
+            $e
+        );
     }
 
     if ($limit !== null) {
@@ -357,9 +413,9 @@ function run_branch_retag(
     // Resolving a tag title costs a round trip, and a run moves many members
     // between the same handful of branches, so resolve each title once.
     $tagIds = [];
-    $resolve = function ($title) use (&$tagIds, $resolve_tag) {
+    $resolve = function ($title) use (&$tagIds, $resolve_tag, $retry) {
         if (!array_key_exists($title, $tagIds)) {
-            $tag = $resolve_tag($title);
+            $tag = $retry(fn() => $resolve_tag($title));
             $tagIds[$title] = $tag['id'] ?? null;
         }
         return $tagIds[$title];
@@ -380,7 +436,8 @@ function run_branch_retag(
         try {
             if ($action['addTag'] !== null) {
                 $tagId = $resolve($action['addTag']);
-                $ok = $tagId !== null && $add_tag($action['id'], $tagId) === ZetkinService::TAG_OK;
+                $ok = $tagId !== null
+                    && $retry(fn() => $add_tag($action['id'], $tagId)) === ZetkinService::TAG_OK;
                 if ($ok) {
                     log_info("Tagged {$action['email']} as {$action['addTag']}");
                 } else {
@@ -396,7 +453,9 @@ function run_branch_retag(
                     $tagId = $resolve($title);
                     // A missing tag means the end state is already true, which is
                     // as good as removed.
-                    $removed = $tagId === null ? ZetkinService::TAG_ERROR : $remove_tag($action['id'], $tagId);
+                    $removed = $tagId === null
+                        ? ZetkinService::TAG_ERROR
+                        : $retry(fn() => $remove_tag($action['id'], $tagId));
                     if (!in_array($removed, [ZetkinService::TAG_OK, ZetkinService::TAG_MISSING], true)) {
                         $ok = false;
                         log_warning("Could not remove tag $title from {$action['email']}");
